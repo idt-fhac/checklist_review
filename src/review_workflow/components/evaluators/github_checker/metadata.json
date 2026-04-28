@@ -1,0 +1,26 @@
+{
+  "id": "github_checker",
+  "name": "github_checker",
+  "display_name": "Github Checker",
+  "description": "Checks a Github repository structure and files.",
+  "type": "tool",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "tool_def",
+      "type": "object",
+      "description": "Tool definition config"
+    }
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "provider_id": {
+        "type": "string",
+        "label": "LLM Provider",
+        "description": "LLM Provider ID"
+      }
+    },
+    "required": ["provider_id"]
+  }
+}

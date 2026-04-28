@@ -1,0 +1,1417 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<style>
+  .settings-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: all 0.3s ease;
+    margin-bottom: 1.5rem;
+  }
+  .settings-card:hover {
+    box-shadow: 0 8px 30px rgba(15, 23, 42, 0.1);
+  }
+  .settings-card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 12px 12px 0 0;
+  }
+  .settings-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #0f172a;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .settings-card-body {
+    padding: 1.5rem;
+  }
+  .form-label {
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .form-select, .form-control {
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+  }
+  .form-select:focus, .form-control:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+  }
+  .form-check-label {
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+  }
+  .form-check-input {
+    cursor: pointer;
+  }
+  .form-check-input:checked {
+    background-color: #2563eb;
+    border-color: #2563eb;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border: none;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.2s ease;
+  }
+  .btn-success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+  .btn-outline-secondary {
+    border: 2px solid #64748b;
+    color: #64748b;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .btn-outline-secondary:hover {
+    background: #64748b;
+    color: white;
+    border-color: #64748b;
+  }
+  .btn-outline-danger {
+    border: 2px solid #ef4444;
+    color: #ef4444;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+  .btn-outline-danger:hover {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+  }
+  .providers-list-container {
+    max-height: 600px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+  .providers-list-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  .providers-list-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+  .providers-list-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  .providers-list-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  .provider-item {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+  }
+  .provider-item:hover {
+    background-color: #f8fafc;
+  }
+  .provider-item:hover .duplicate-btn {
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+    pointer-events: auto !important;
+  }
+  .duplicate-btn {
+    opacity: 0;
+    transform: translateX(10px);
+    pointer-events: none;
+    transition: all 0.2s ease;
+  }
+  .provider-item:last-child {
+    border-bottom: none;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+  }
+  .empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    opacity: 0.5;
+  }
+  .section-divider {
+    margin: 1.5rem 0;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+  }
+  .edit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .edit-modal {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+  }
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .edit-modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .edit-modal-header h5 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #0f172a;
+  }
+  .edit-modal-body {
+    padding: 1.5rem;
+  }
+  .edit-modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+  .edit-modal-btn {
+    padding: 0.625rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .edit-modal-btn-cancel {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+  .edit-modal-btn-cancel:hover {
+    background: #e2e8f0;
+  }
+  .edit-modal-btn-save {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+  }
+  .edit-modal-btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  }
+  .settings-card-body .row {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .settings-card-body .col-md-6 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .settings-card-body .col-md-6:first-child {
+    border-right: 1px solid #e2e8f0;
+  }
+  @media (max-width: 768px) {
+    .settings-card-body .col-md-6:first-child {
+      border-right: none;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+  }
+</style>
+
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <!-- Left Column: Settings Categories -->
+    <div class="col-12 col-lg-11 col-xl-10">
+      <form method="POST" action="{{ url_for('settings.index') }}">
+        <input type="hidden" name="form_type" value="general_settings">
+        
+        <!-- App Settings (combined) -->
+        <div class="settings-card">
+          <div class="settings-card-header">
+            <h6 class="settings-card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+              </svg>
+              App Settings
+            </h6>
+          </div>
+          <div class="settings-card-body">
+            <div class="mb-4 pb-4" style="border-bottom: 1px solid #e2e8f0;">
+              <label class="form-label mb-3 d-block">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                  <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+                </svg>
+                General
+              </label>
+
+              <label class="form-label" style="font-size: 0.8rem;">Default Page on App Start</label>
+              <select class="form-select" name="default_page">
+                <option value="checklist_review" {% if settings.get('default_page', 'checklist_review') == 'checklist_review' %}selected{% endif %}>Checklist Review</option>
+                <option value="collection" {% if settings.get('default_page') == 'collection' %}selected{% endif %}>Collection</option>
+                <option value="analysis" {% if settings.get('default_page') == 'analysis' %}selected{% endif %}>Analysis</option>
+                <option value="human_verification" {% if settings.get('default_page') == 'human_verification' %}selected{% endif %}>Human Verification</option>
+                <option value="settings" {% if settings.get('default_page') == 'settings' %}selected{% endif %}>Settings</option>
+              </select>
+              <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Choose which page to show when the app starts.</div>
+            </div>
+
+            <label class="form-label mb-3 d-block">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5z"/>
+              </svg>
+              Document Processing
+            </label>
+
+            <div class="row g-4">
+              <!-- Left: PDF Metadata Extraction -->
+              <div class="col-md-6" id="settings-pdf-metadata">
+                <label class="form-label mb-3 d-block">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                    <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5z"/>
+                    <path d="M9.5 0v3a1 1 0 0 0 1 1h3"/>
+                    <path d="M4.5 9.5A.5.5 0 0 1 5 9h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0 2A.5.5 0 0 1 5 11h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 5 7h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/>
+                  </svg>
+                  PDF Metadata Extraction
+                </label>
+                <div class="form-text mb-3" style="color: #64748b; font-size: 0.75rem;">Choose how to extract title, authors, and abstract from PDFs.</div>
+
+                <div class="mb-3">
+                  <label class="form-label" style="font-size: 0.8rem;">Extraction Method</label>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="pdf_metadata_extraction_method" id="pdf_metadata_method_rule_based" value="rule_based"
+                           {% if settings.get('pdf_metadata_extraction_method') == 'rule_based' %}checked{% endif %}
+                           onchange="togglePdfMetadataProvider()">
+                    <label class="form-check-label" for="pdf_metadata_method_rule_based">
+                      Rule-based first-page extraction
+                    </label>
+                    <div class="form-text" style="color: #64748b; font-size: 0.75rem;">Extracts metadata from first-page layout and section patterns without using an LLM.</div>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="pdf_metadata_extraction_method" id="pdf_metadata_method_llm" value="llm"
+                           {% if settings.get('pdf_metadata_extraction_method', 'llm') == 'llm' %}checked{% endif %}
+                           onchange="togglePdfMetadataProvider()">
+                    <label class="form-check-label" for="pdf_metadata_method_llm">
+                      LLM provider
+                    </label>
+                  </div>
+                </div>
+                <div id="pdf_metadata_provider_container">
+                  <label class="form-label" style="font-size: 0.8rem;">PDF Processing LLM Provider</label>
+                  <select class="form-select" name="pdf_processing_llm_provider_id" id="pdf_processing_llm_provider_id">
+                    <option value="">Default (First Provider)</option>
+                    {% for provider in providers %}
+                      <option value="{{ provider.id }}" {% if settings.get('pdf_processing_llm_provider_id') == provider.id %}selected{% endif %}>
+                        {{ provider.name }} ({{ provider.type }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Select LLM provider for extracting metadata from PDFs. If not set, uses the first provider in the list.</div>
+                </div>
+              </div>
+
+              <!-- Right: Visualization Embedding (moved from Embedding card) -->
+              <div class="col-md-6">
+                <label class="form-label mb-3 d-block">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+                  </svg>
+                  Visualization Embedding
+                </label>
+                <div class="form-text mb-3" style="color: #64748b; font-size: 0.75rem;">Used for embedding visualizations (e.g. abstract similarity). RAG embedding is configured in the Process Designer per Question Reviewer node.</div>
+
+                <div class="mb-3">
+                  <label class="form-label" style="font-size: 0.8rem;">Embedding Model Type</label>
+                  <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="embedding_model_type" id="embed_tfidf" value="tfidf"
+                           {% if settings.embedding_model_type == 'tfidf' %}checked{% endif %}
+                           onchange="toggleEmbeddingOptions()">
+                    <label class="form-check-label" for="embed_tfidf">
+                      Scikit-Learn (TF-IDF)
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="radio" name="embedding_model_type" id="embed_provider" value="provider"
+                           {% if settings.embedding_model_type == 'provider' %}checked{% endif %}
+                           onchange="toggleEmbeddingOptions()">
+                    <label class="form-check-label" for="embed_provider">
+                      Provider
+                    </label>
+                  </div>
+                </div>
+
+                <div class="mb-3" id="embedding_provider_select_container" style="display: none;">
+                  <label class="form-label" style="font-size: 0.8rem;">Embedding Provider</label>
+                  <select class="form-select" name="embedding_provider_id" id="embedding_provider_id_select">
+                    <option value="">Select an embedding provider...</option>
+                    {% for provider in providers %}
+                      {% if provider.get('is_embedding_model', False) %}
+                        <option value="{{ provider.id }}" {% if settings.get('embedding_provider_id') == provider.id %}selected{% endif %}>
+                          {{ provider.name }} ({{ provider.type }})
+                        </option>
+                      {% endif %}
+                    {% endfor %}
+                  </select>
+                  <div class="form-text" style="color: #64748b; font-size: 0.75rem;">Select an embedding model provider for visualization.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-body">
+            <button type="submit" class="btn btn-primary w-100">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/>
+              </svg>
+              Save All Settings
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row justify-content-center mt-4">
+    <!-- Right Column: LLM Providers -->
+    <div class="col-12 col-lg-11 col-xl-10">
+      
+      <!-- LLM Providers Card -->
+      <div class="settings-card" id="settings-llm-providers">
+        <div class="settings-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h6 class="settings-card-title" style="margin: 0;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+              <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+            </svg>
+            LLM Providers
+          </h6>
+          <button type="button" class="btn btn-success btn-sm" onclick="openAddProviderModal()" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+            </svg>
+            Add Provider
+          </button>
+        </div>
+        <div class="settings-card-body" style="padding: 0;">
+          <div class="providers-list-container" style="max-height: 600px; overflow-y: auto;">
+            {% if providers %}
+              {% for provider in providers %}
+                <div class="provider-item d-flex justify-content-between align-items-center">
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <strong class="provider-display-name" style="color: #0f172a;">{{ provider.name }}</strong>
+                      {% if provider.get('is_embedding_model', False) %}
+                        <span class="badge bg-danger" style="font-size: 0.75rem;">emb: {{ provider.type }}</span>
+                      {% else %}
+                        <span class="badge bg-secondary" style="font-size: 0.75rem;">{{ provider.type }}</span>
+                      {% endif %}
+                      {% if provider.get('accepts_image_input', False) %}
+                        <span class="badge" style="font-size: 0.75rem; background-color: #b8860b; color: #fff;">image</span>
+                      {% endif %}
+                    </div>
+                    <small class="text-muted d-block" style="font-size: 0.875rem;">
+                      {% if provider.type == 'ollama' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                          <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
+                        </svg>
+                        {{ provider.base_url }} {% if provider.model_name %}({{ provider.model_name }}){% endif %}
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                          <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+                        </svg>
+                        {{ provider.model_name }} @ {{ provider.base_url }}
+                      {% endif %}
+                    </small>
+                  </div>
+                  <div class="d-flex gap-2 ms-3 align-items-center">
+                    <form method="POST" action="{{ url_for('settings.index') }}" style="margin: 0;" class="duplicate-provider-form" data-provider-name="{{ provider.name | e }}">
+                      <input type="hidden" name="form_type" value="duplicate_provider">
+                      <input type="hidden" name="provider_id" value="{{ provider.id }}">
+                      <button type="button" class="btn btn-sm btn-outline-primary duplicate-btn" onclick="openDuplicateProviderModal(this)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                          <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
+                        </svg>
+                        Duplicate
+                      </button>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-secondary edit-provider-btn" 
+                            data-provider-id="{{ provider.id }}"
+                            data-provider-name="{{ provider.name }}"
+                            data-provider-type="{{ provider.type }}"
+                            data-provider-base-url="{{ provider.base_url }}"
+                            data-provider-model-name="{{ provider.model_name or '' }}"
+                            data-provider-api-key="{{ provider.api_key or '' }}"
+                            data-provider-port="{{ provider.port or '' }}"
+                            data-provider-params="{{ provider.get('params', {}) | tojson }}"
+                            data-provider-is-embedding="{{ provider.get('is_embedding_model', False) }}"
+                            data-provider-accepts-image-input="{{ provider.get('accepts_image_input', False) }}">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0 .11.172l2 2a.5.5 0 0 0 .708 0l.13-.13z"/>
+                      </svg>
+                      Edit
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="openDeleteConfirmModal('{{ provider.id }}', '{{ provider.name | escape }}')">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-state">
+                <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                  <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                </svg>
+                <p class="text-muted mb-0">No providers configured yet. Click "Add Provider" to get started.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Add Provider Modal -->
+<div id="addProviderModal" class="edit-modal-overlay" style="display: none;">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+      </svg>
+      <h5>Add New LLM Provider</h5>
+    </div>
+    <form id="addProviderForm" method="POST" action="{{ url_for('settings.index') }}" onsubmit="return validateAddProviderForm()">
+      <input type="hidden" name="form_type" value="add_provider">
+      <div class="edit-modal-body">
+        <div class="mb-3">
+          <label class="form-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+            </svg>
+            Provider Name
+          </label>
+          <input type="text" class="form-control" name="name" id="add_provider_name" placeholder="e.g. Local Ollama, OpenAI Main" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4"/>
+            </svg>
+            Type
+          </label>
+          <select class="form-select" name="provider_type" id="add_provider_type_select" onchange="toggleAddProviderFields()">
+            <option value="ollama">Ollama</option>
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Gemini</option>
+            <option value="litellm">LiteLLM</option>
+          </select>
+        </div>
+
+        <!-- Ollama Fields -->
+        <div id="add_ollama_fields">
+          <div class="mb-3">
+            <label class="form-label">Base URL</label>
+            <div class="input-group">
+              <input type="text" class="form-control" name="ollama_base_url" id="add_ollama_base_url" placeholder="http://localhost:11434">
+              <button class="btn btn-outline-secondary" type="button" onclick="fetchAddProviderOllamaModels()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                  <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                  <path d="M8.354.646a.5.5 0 0 0-.708 0l-3 3a.5.5 0 0 0 .708.708L8 1.707l2.646 2.647a.5.5 0 0 0 .708-.708z"/>
+                </svg>
+                Fetch Models
+              </button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model (Optional)</label>
+            <select class="form-select" name="ollama_model_name" id="add_ollama_model_name">
+              <option value="">Select a model...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- OpenAI Fields -->
+        <div id="add_openai_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">Base URL (Optional)</label>
+            <input type="text" class="form-control" name="openai_base_url" id="add_openai_base_url" placeholder="https://api.openai.com/v1">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Leave blank to use default OpenAI URL.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="openai_api_key" id="add_openai_api_key" placeholder="sk-...">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="openai_model_name" id="add_openai_model_name" placeholder="e.g. gpt-4o" value="gpt-4o">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gpt-4o).</div>
+          </div>
+        </div>
+
+        <!-- Gemini Fields -->
+        <div id="add_gemini_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="gemini_api_key" id="add_gemini_api_key" placeholder="AIza...">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="gemini_model_name" id="add_gemini_model_name" placeholder="e.g. gemini-2.5-flash" value="gemini-2.5-flash">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gemini-2.5-flash).</div>
+          </div>
+        </div>
+
+        <!-- LiteLLM Fields -->
+        <div id="add_litellm_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">Base URL</label>
+            <input type="text" class="form-control" name="litellm_base_url" id="add_litellm_base_url" placeholder="http://localhost:4000">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">LiteLLM proxy server URL (e.g., http://localhost:4000).</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Port (Optional)</label>
+            <input type="number" class="form-control" name="litellm_port" id="add_litellm_port" placeholder="e.g. 8080" min="1" max="65535">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Optional port number to append to the base URL.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="litellm_api_key" id="add_litellm_api_key" placeholder="sk-...">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="litellm_model_name" id="add_litellm_model_name" placeholder="e.g. gpt-4o, mistralai/Mistral-Small-3.2-24B-Instruct-2506">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gpt-4o or provider/model format like mistralai/Mistral-Small-3.2-24B-Instruct-2506).</div>
+          </div>
+        </div>
+
+        <!-- Provider Options -->
+        <div class="mb-3" style="border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="is_embedding_model" id="add_is_embedding_model" onchange="toggleAddDirectUpload()">
+            <label class="form-check-label" for="add_is_embedding_model">
+              This is an embedding model
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="accepts_image_input" id="add_accepts_image_input">
+            <label class="form-check-label" for="add_accepts_image_input">
+              Accepts Image Input
+            </label>
+            <div class="form-text" style="color: #64748b; font-size: 0.75rem; margin-top: 0.25rem;">Only available for non-embedding models</div>
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-footer">
+        <button type="button" class="edit-modal-btn edit-modal-btn-cancel" onclick="closeAddProviderModal()">Cancel</button>
+        <button type="submit" class="edit-modal-btn edit-modal-btn-save">Add Provider</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Provider Modal -->
+<div id="editProviderModal" class="edit-modal-overlay" style="display: none;">
+  <div class="edit-modal">
+    <div class="edit-modal-header">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0 .11.172l2 2a.5.5 0 0 0 .708 0l.13-.13z"/>
+      </svg>
+      <h5>Edit Provider</h5>
+    </div>
+    <form id="editProviderForm" method="POST" action="{{ url_for('settings.index') }}" onsubmit="return validateEditProviderForm()">
+      <input type="hidden" name="form_type" value="update_provider">
+      <input type="hidden" name="provider_id" id="edit_provider_id">
+      <div class="edit-modal-body">
+        <div class="mb-3">
+          <label class="form-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+            </svg>
+            Provider Name
+          </label>
+          <input type="text" class="form-control" name="name" id="edit_provider_name" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+              <path d="M8 4a.5.5 0 0 1 .5.5V6a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4"/>
+            </svg>
+            Type
+          </label>
+          <select class="form-select" name="provider_type" id="edit_provider_type" onchange="toggleEditProviderFields()">
+            <option value="ollama">Ollama</option>
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Gemini</option>
+            <option value="litellm">LiteLLM</option>
+          </select>
+        </div>
+
+        <!-- Ollama Fields -->
+        <div id="edit_ollama_fields">
+          <div class="mb-3">
+            <label class="form-label">Base URL</label>
+            <div class="input-group">
+              <input type="text" class="form-control" name="ollama_base_url" id="edit_ollama_base_url" placeholder="http://localhost:11434">
+              <button class="btn btn-outline-secondary" type="button" onclick="fetchEditProviderOllamaModels()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                  <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                  <path d="M8.354.646a.5.5 0 0 0-.708 0l-3 3a.5.5 0 0 0 .708.708L8 1.707l2.646 2.647a.5.5 0 0 0 .708-.708z"/>
+                </svg>
+                Fetch Models
+              </button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model (Optional)</label>
+            <select class="form-select" name="ollama_model_name" id="edit_ollama_model_name">
+              <option value="">Select a model...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- OpenAI Fields -->
+        <div id="edit_openai_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">Base URL (Optional)</label>
+            <input type="text" class="form-control" name="openai_base_url" id="edit_openai_base_url" placeholder="https://api.openai.com/v1">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Leave blank to use default OpenAI URL.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="openai_api_key" id="edit_openai_api_key" placeholder="sk-...">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Leave blank to keep existing API key.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="openai_model_name" id="edit_openai_model_name" placeholder="e.g. gpt-4o">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gpt-4o).</div>
+          </div>
+        </div>
+
+        <!-- Gemini Fields -->
+        <div id="edit_gemini_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="gemini_api_key" id="edit_gemini_api_key" placeholder="AIza...">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Leave blank to keep existing API key.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="gemini_model_name" id="edit_gemini_model_name" placeholder="e.g. gemini-2.5-flash">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gemini-2.5-flash).</div>
+          </div>
+        </div>
+
+        <!-- LiteLLM Fields -->
+        <div id="edit_litellm_fields" style="display: none;">
+          <div class="mb-3">
+            <label class="form-label">Base URL</label>
+            <input type="text" class="form-control" name="litellm_base_url" id="edit_litellm_base_url" placeholder="http://localhost:4000">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">LiteLLM proxy server URL (e.g., http://localhost:4000).</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Port (Optional)</label>
+            <input type="number" class="form-control" name="litellm_port" id="edit_litellm_port" placeholder="e.g. 8080" min="1" max="65535">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Optional port number to append to the base URL.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-2">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.338 3.59q-1.168.15-2.218.867a4.823 4.823 0 0 0-.9 1.686q-.244.7-.398 1.5a14.7 14.7 0 0 0 .36 1.475 23.6 23.6 0 0 0 1.267 2.618c.255.408.564.79.933 1.12q.184.167.38.315a.9.9 0 0 0 .6.245.9.9 0 0 0 .6-.245q.196-.148.38-.315c.369-.33.678-.712.933-1.12a23.6 23.6 0 0 0 1.267-2.618 14.7 14.7 0 0 0 .36-1.475q-.154-.8-.398-1.5a4.8 4.8 0 0 0-.9-1.686q-1.05-.717-2.218-.867m.353-3.408A13 13 0 0 1 8 1.133a13 13 0 0 1 2.31.25c1.957.267 3.636 1.45 4.843 3.365a11.8 11.8 0 0 1 .496 2.17 14.1 14.1 0 0 1-.402 2.158 20.8 20.8 0 0 1-1.23 2.94 25.2 25.2 0 0 1-1.225 2.05 6.1 6.1 0 0 1-1.8 1.7q-.34.25-.8.41a11.8 11.8 0 0 1-2.17.496c-.376.06-.754.095-1.124.1a1 1 0 0 1-.002 0 11.8 11.8 0 0 1-1.13-.1 20.7 20.7 0 0 1-1.354-.492 25.2 25.2 0 0 1-1.225-2.05 6.1 6.1 0 0 1-1.8-1.7q-.34-.25-.8-.41a11.8 11.8 0 0 1-2.17-.496 14.1 14.1 0 0 1-.402-2.158 11.8 11.8 0 0 1 .496-2.17c1.207-1.914 2.886-3.098 4.843-3.365Q6.69 1.133 8 1.133z"/>
+                <path d="M8 8a2 2 0 1 1 0-4 2 2 0 0 1 0 4m0 1a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>
+              </svg>
+              API Key
+            </label>
+            <input type="password" class="form-control" name="litellm_api_key" id="edit_litellm_api_key" placeholder="sk-...">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Leave blank to keep existing API key.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Model Name</label>
+            <input type="text" class="form-control" name="litellm_model_name" id="edit_litellm_model_name" placeholder="e.g. gpt-4o, mistralai/Mistral-Small-3.2-24B-Instruct-2506">
+            <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Enter the model name (e.g., gpt-4o or provider/model format like mistralai/Mistral-Small-3.2-24B-Instruct-2506).</div>
+          </div>
+        </div>
+
+        <!-- Provider Options -->
+        <div class="mb-3" style="border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1rem;">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="is_embedding_model" id="edit_is_embedding_model" onchange="toggleEditDirectUpload()">
+            <label class="form-check-label" for="edit_is_embedding_model">
+              This is an embedding model
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="accepts_image_input" id="edit_accepts_image_input">
+            <label class="form-check-label" for="edit_accepts_image_input">
+              Accepts Image Input
+            </label>
+            <div class="form-text" style="color: #64748b; font-size: 0.75rem; margin-top: 0.25rem;">Only available for non-embedding models</div>
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-footer">
+        <button type="button" class="edit-modal-btn edit-modal-btn-cancel" onclick="closeEditProviderModal()">Cancel</button>
+        <button type="submit" class="edit-modal-btn edit-modal-btn-save">Update Provider</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Duplicate Provider Modal -->
+<div id="duplicateProviderModal" class="edit-modal-overlay" style="display: none;">
+  <div class="edit-modal" style="max-width: 460px;">
+    <div class="edit-modal-header">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1z"/>
+      </svg>
+      <h5>Duplicate Provider</h5>
+    </div>
+    <form id="duplicateProviderForm" method="POST" action="{{ url_for('settings.index') }}">
+      <input type="hidden" name="form_type" value="duplicate_provider">
+      <input type="hidden" name="provider_id" id="duplicate_provider_id">
+      <div class="edit-modal-body">
+        <label class="form-label" for="duplicate_provider_name_input">New Provider Name</label>
+        <input type="text" class="form-control" name="duplicate_name" id="duplicate_provider_name_input" required>
+        <div class="form-text" style="color: #64748b; font-size: 0.875rem;">
+          Keep the suggested name or enter your own.
+        </div>
+      </div>
+      <div class="edit-modal-footer">
+        <button type="button" class="edit-modal-btn edit-modal-btn-cancel" onclick="closeDuplicateProviderModal()">Cancel</button>
+        <button type="submit" class="edit-modal-btn edit-modal-btn-save">Create Duplicate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="edit-modal-overlay" style="display: none;">
+  <div class="edit-modal" style="max-width: 400px;">
+    <div class="edit-modal-header">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" class="text-danger" style="color: #ef4444;">
+        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+      </svg>
+      <h5>Delete Provider</h5>
+    </div>
+    <div class="edit-modal-body text-center py-4">
+      <p class="mb-0">Are you sure you want to delete <strong id="delete_provider_name_display"></strong>?</p>
+      <p class="text-muted small mt-2">This action cannot be undone.</p>
+    </div>
+    <div class="edit-modal-footer">
+      <form id="deleteProviderForm" method="POST" action="{{ url_for('settings.index') }}" style="margin: 0; width: 100%; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <input type="hidden" name="form_type" value="delete_provider">
+        <input type="hidden" name="provider_id" id="delete_provider_id">
+        <button type="button" class="edit-modal-btn edit-modal-btn-cancel" onclick="closeDeleteConfirmModal()">Cancel</button>
+        <button type="submit" class="edit-modal-btn btn-danger" style="background: #ef4444; color: white;">Delete</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleEmbeddingOptions() {
+    const isProvider = document.getElementById('embed_provider').checked;
+    const container = document.getElementById('embedding_provider_select_container');
+    if (isProvider) {
+      container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
+    }
+  }
+
+  function togglePdfMetadataProvider() {
+    const useLlm = document.getElementById('pdf_metadata_method_llm').checked;
+    const container = document.getElementById('pdf_metadata_provider_container');
+    container.style.display = useLlm ? 'block' : 'none';
+  }
+
+  function toggleAddDirectUpload() {
+    const isEmbedding = document.getElementById('add_is_embedding_model').checked;
+    const imageInputCheckbox = document.getElementById('add_accepts_image_input');
+    if (isEmbedding) {
+      imageInputCheckbox.checked = false;
+      imageInputCheckbox.disabled = true;
+    } else {
+      imageInputCheckbox.disabled = false;
+    }
+  }
+
+  function toggleEditDirectUpload() {
+    const isEmbedding = document.getElementById('edit_is_embedding_model').checked;
+    const imageInputCheckbox = document.getElementById('edit_accepts_image_input');
+    if (isEmbedding) {
+      imageInputCheckbox.checked = false;
+      imageInputCheckbox.disabled = true;
+    } else {
+      imageInputCheckbox.disabled = false;
+    }
+  }
+
+
+  // Add Provider Modal Functions
+  function openAddProviderModal() {
+    const modal = document.getElementById('addProviderModal');
+    // Reset form
+    document.getElementById('addProviderForm').reset();
+    // Reset fields visibility
+    toggleAddProviderFields();
+    modal.style.display = 'flex';
+  }
+
+  function closeAddProviderModal() {
+    const modal = document.getElementById('addProviderModal');
+    modal.style.animation = 'fadeIn 0.2s ease-out reverse';
+    setTimeout(() => {
+      modal.style.display = 'none';
+      modal.style.animation = 'fadeIn 0.2s ease-out';
+      // Reset form
+      document.getElementById('addProviderForm').reset();
+      // Reset field visibility
+      toggleAddProviderFields();
+    }, 200);
+  }
+
+  function toggleAddProviderFields() {
+    const type = document.getElementById('add_provider_type_select').value;
+    const ollamaFields = document.getElementById('add_ollama_fields');
+    const openaiFields = document.getElementById('add_openai_fields');
+    const geminiFields = document.getElementById('add_gemini_fields');
+    const litellmFields = document.getElementById('add_litellm_fields');
+
+    // Hide all fields first
+    ollamaFields.style.display = 'none';
+    openaiFields.style.display = 'none';
+    geminiFields.style.display = 'none';
+    litellmFields.style.display = 'none';
+
+    // Remove required attributes from all fields
+    ollamaFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    openaiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    geminiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    litellmFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+
+    // Show and set required for the selected type
+    if (type === 'ollama') {
+      ollamaFields.style.display = 'block';
+      ollamaFields.querySelectorAll('input[type="text"]').forEach(el => {
+        if (el.name === 'ollama_base_url') el.setAttribute('required', 'required');
+      });
+    } else if (type === 'openai') {
+      openaiFields.style.display = 'block';
+      document.getElementById('add_openai_api_key').setAttribute('required', 'required');
+      document.getElementById('add_openai_model_name').setAttribute('required', 'required');
+    } else if (type === 'gemini') {
+      geminiFields.style.display = 'block';
+      document.getElementById('add_gemini_api_key').setAttribute('required', 'required');
+      document.getElementById('add_gemini_model_name').setAttribute('required', 'required');
+    } else if (type === 'litellm') {
+      litellmFields.style.display = 'block';
+      litellmFields.querySelectorAll('input[type="text"]').forEach(el => {
+        if (el.name === 'litellm_base_url' || el.name === 'litellm_model_name') {
+          el.setAttribute('required', 'required');
+        }
+      });
+    }
+  }
+
+  function validateAddProviderForm() {
+    const type = document.getElementById('add_provider_type_select').value;
+    
+    // Remove required from all hidden fields
+    const ollamaFields = document.getElementById('add_ollama_fields');
+    const openaiFields = document.getElementById('add_openai_fields');
+    const geminiFields = document.getElementById('add_gemini_fields');
+    const litellmFields = document.getElementById('add_litellm_fields');
+    
+    if (type !== 'ollama') {
+      ollamaFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'openai') {
+      openaiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'gemini') {
+      geminiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'litellm') {
+      litellmFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    
+    return true;
+  }
+
+  function validateEditProviderForm() {
+    const type = document.getElementById('edit_provider_type').value;
+    
+    // Remove required from all hidden fields
+    const ollamaFields = document.getElementById('edit_ollama_fields');
+    const openaiFields = document.getElementById('edit_openai_fields');
+    const geminiFields = document.getElementById('edit_gemini_fields');
+    const litellmFields = document.getElementById('edit_litellm_fields');
+    
+    if (type !== 'ollama') {
+      ollamaFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'openai') {
+      openaiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'gemini') {
+      geminiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    if (type !== 'litellm') {
+      litellmFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    }
+    
+    return true;
+  }
+
+  function fetchAddProviderOllamaModels() {
+    const urlInput = document.getElementById('add_ollama_base_url');
+    const select = document.getElementById('add_ollama_model_name');
+    const url = urlInput.value.trim();
+    
+    if (!url) {
+      alert("Please enter a Base URL first.");
+      return;
+    }
+
+    select.innerHTML = '<option>Loading...</option>';
+    select.disabled = true;
+    
+    fetch("{{ url_for('settings.index') }}api/ollama/check?url=" + encodeURIComponent(url))
+      .then(res => res.json())
+      .then(data => {
+        select.innerHTML = '';
+        if (data.models && data.models.length > 0) {
+          data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.text = m;
+            select.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.text = "No models found";
+          select.appendChild(opt);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        select.innerHTML = '<option>Error loading models</option>';
+      })
+      .finally(() => {
+        select.disabled = false;
+      });
+  }
+
+
+  // Edit Provider Modal Functions
+  function openEditProviderModal(providerData) {
+    const modal = document.getElementById('editProviderModal');
+    document.getElementById('edit_provider_id').value = providerData.id || '';
+    document.getElementById('edit_provider_name').value = providerData.name || '';
+    document.getElementById('edit_provider_type').value = providerData.type || 'ollama';
+    
+    // Set Ollama fields
+    document.getElementById('edit_ollama_base_url').value = providerData.base_url || '';
+    if (providerData.model_name && providerData.type === 'ollama') {
+      const select = document.getElementById('edit_ollama_model_name');
+      select.innerHTML = `<option value="${providerData.model_name}" selected>${providerData.model_name}</option>`;
+    } else {
+      document.getElementById('edit_ollama_model_name').innerHTML = '<option value="">Select a model...</option>';
+    }
+    
+    // Set OpenAI fields
+    document.getElementById('edit_openai_base_url').value = providerData.base_url || '';
+    document.getElementById('edit_openai_api_key').value = ''; // Don't show existing API key
+    document.getElementById('edit_openai_model_name').value = providerData.model_name || '';
+    
+    // Set Gemini fields
+    document.getElementById('edit_gemini_api_key').value = ''; // Don't show existing API key
+    document.getElementById('edit_gemini_model_name').value = providerData.model_name || '';
+    
+    // Set LiteLLM fields
+    document.getElementById('edit_litellm_base_url').value = providerData.base_url || '';
+    document.getElementById('edit_litellm_port').value = providerData.port || '';
+    document.getElementById('edit_litellm_api_key').value = ''; // Don't show existing API key
+    document.getElementById('edit_litellm_model_name').value = providerData.model_name || '';
+    
+    // Set embedding and image input flags
+    const isEmbedding = providerData.is_embedding_model || false;
+    const acceptsImageInput = providerData.accepts_image_input || false;
+    document.getElementById('edit_is_embedding_model').checked = isEmbedding;
+    document.getElementById('edit_accepts_image_input').checked = acceptsImageInput && !isEmbedding;
+    toggleEditDirectUpload();
+    
+    toggleEditProviderFields();
+    modal.style.display = 'flex';
+    
+    // Ensure the fields are visible before any operations
+    // Small delay to ensure DOM is fully rendered
+    setTimeout(() => {
+      const openaiFields = document.getElementById('edit_openai_fields');
+      const geminiFields = document.getElementById('edit_gemini_fields');
+      if (openaiFields && providerData.type === 'openai') {
+        openaiFields.style.display = 'block';
+        // Force a reflow
+        void openaiFields.offsetHeight;
+      }
+      if (geminiFields && providerData.type === 'gemini') {
+        geminiFields.style.display = 'block';
+        // Force a reflow
+        void geminiFields.offsetHeight;
+      }
+    }, 10);
+  }
+
+
+  function closeEditProviderModal() {
+    const modal = document.getElementById('editProviderModal');
+    modal.style.animation = 'fadeIn 0.2s ease-out reverse';
+    setTimeout(() => {
+      modal.style.display = 'none';
+      modal.style.animation = 'fadeIn 0.2s ease-out';
+      // Reset form
+      document.getElementById('editProviderForm').reset();
+    }, 200);
+  }
+
+  function toggleEditProviderFields() {
+    const type = document.getElementById('edit_provider_type').value;
+    const ollamaFields = document.getElementById('edit_ollama_fields');
+    const openaiFields = document.getElementById('edit_openai_fields');
+    const geminiFields = document.getElementById('edit_gemini_fields');
+    const litellmFields = document.getElementById('edit_litellm_fields');
+
+    // Hide all fields first
+    ollamaFields.style.display = 'none';
+    openaiFields.style.display = 'none';
+    geminiFields.style.display = 'none';
+    litellmFields.style.display = 'none';
+
+    // Remove required attributes from all fields
+    ollamaFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    openaiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    geminiFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+    litellmFields.querySelectorAll('[required]').forEach(el => el.removeAttribute('required'));
+
+    // Show and set required for the selected type
+    if (type === 'ollama') {
+      ollamaFields.style.display = 'block';
+      ollamaFields.querySelectorAll('input[type="text"]').forEach(el => {
+        if (el.name === 'ollama_base_url') el.setAttribute('required', 'required');
+      });
+    } else if (type === 'openai') {
+      openaiFields.style.display = 'block';
+      document.getElementById('edit_openai_model_name').setAttribute('required', 'required');
+    } else if (type === 'gemini') {
+      geminiFields.style.display = 'block';
+      document.getElementById('edit_gemini_model_name').setAttribute('required', 'required');
+    } else if (type === 'litellm') {
+      litellmFields.style.display = 'block';
+      litellmFields.querySelectorAll('input[type="text"]').forEach(el => {
+        if (el.name === 'litellm_base_url' || el.name === 'litellm_model_name') {
+          el.setAttribute('required', 'required');
+        }
+      });
+    }
+  }
+
+  function fetchEditProviderOllamaModels() {
+    const urlInput = document.getElementById('edit_ollama_base_url');
+    const select = document.getElementById('edit_ollama_model_name');
+    const url = urlInput.value.trim();
+    
+    if (!url) {
+      alert("Please enter a Base URL first.");
+      return;
+    }
+
+    select.innerHTML = '<option>Loading...</option>';
+    select.disabled = true;
+
+    fetch("{{ url_for('settings.index') }}api/ollama/check?url=" + encodeURIComponent(url))
+      .then(res => res.json())
+      .then(data => {
+        select.innerHTML = '';
+        if (data.models && data.models.length > 0) {
+          data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.text = m;
+            select.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.text = "No models found";
+          select.appendChild(opt);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        select.innerHTML = '<option>Error loading models</option>';
+      })
+      .finally(() => {
+        select.disabled = false;
+      });
+  }
+
+  function getExistingProviderNames() {
+    return Array.from(document.querySelectorAll('.provider-display-name'))
+      .map(el => el.textContent.trim())
+      .filter(Boolean);
+  }
+
+  function buildDefaultDuplicateName(baseName, existingNames) {
+    const copyPattern = / \(Copy(?: (\d+))?\)$/;
+    const match = baseName.match(copyPattern);
+    let candidate;
+
+    if (match) {
+      const baseNameWithoutCopy = baseName.slice(0, match.index);
+      const copyNum = match[1];
+      const nextNum = copyNum ? Number(copyNum) + 1 : 2;
+      candidate = `${baseNameWithoutCopy} (Copy ${nextNum})`;
+    } else {
+      candidate = `${baseName} (Copy)`;
+    }
+
+    const existingSet = new Set(existingNames);
+    const baseCandidate = candidate;
+    let counter = 2;
+    while (existingSet.has(candidate)) {
+      candidate = `${baseCandidate} ${counter}`;
+      counter += 1;
+    }
+
+    return candidate;
+  }
+
+  function openDuplicateProviderModal(buttonEl) {
+    const sourceForm = buttonEl.closest('.duplicate-provider-form');
+    if (!sourceForm) return;
+
+    const providerId = sourceForm.querySelector('input[name="provider_id"]')?.value || '';
+    const providerName = sourceForm.getAttribute('data-provider-name') || '';
+    const defaultName = buildDefaultDuplicateName(providerName, getExistingProviderNames());
+    const modal = document.getElementById('duplicateProviderModal');
+    const nameInput = document.getElementById('duplicate_provider_name_input');
+
+    document.getElementById('duplicate_provider_id').value = providerId;
+    nameInput.value = defaultName;
+    nameInput.setAttribute('data-default-name', defaultName);
+    modal.style.display = 'flex';
+
+    requestAnimationFrame(() => {
+      nameInput.focus();
+      nameInput.select();
+    });
+  }
+
+  function closeDuplicateProviderModal() {
+    const modal = document.getElementById('duplicateProviderModal');
+    modal.style.animation = 'fadeIn 0.2s ease-out reverse';
+    setTimeout(() => {
+      modal.style.display = 'none';
+      modal.style.animation = 'fadeIn 0.2s ease-out';
+      document.getElementById('duplicateProviderForm').reset();
+      document.getElementById('duplicate_provider_id').value = '';
+      document.getElementById('duplicate_provider_name_input').removeAttribute('data-default-name');
+    }, 200);
+  }
+
+  // Close modals on overlay click
+  document.getElementById('editProviderModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeEditProviderModal();
+    }
+  });
+
+  document.getElementById('addProviderModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeAddProviderModal();
+    }
+  });
+
+  document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeDeleteConfirmModal();
+    }
+  });
+
+  document.getElementById('duplicateProviderModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeDuplicateProviderModal();
+    }
+  });
+
+  document.getElementById('duplicateProviderForm').addEventListener('submit', function() {
+    const nameInput = document.getElementById('duplicate_provider_name_input');
+    const trimmedValue = nameInput.value.trim();
+    if (!trimmedValue) {
+      nameInput.value = nameInput.getAttribute('data-default-name') || '';
+      return;
+    }
+    nameInput.value = trimmedValue;
+  });
+
+  function openDeleteConfirmModal(providerId, providerName) {
+    const modal = document.getElementById('deleteConfirmModal');
+    document.getElementById('delete_provider_id').value = providerId;
+    document.getElementById('delete_provider_name_display').textContent = providerName;
+    modal.style.display = 'flex';
+  }
+
+  function closeDeleteConfirmModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.animation = 'fadeIn 0.2s ease-out reverse';
+    setTimeout(() => {
+      modal.style.display = 'none';
+      modal.style.animation = 'fadeIn 0.2s ease-out';
+      document.getElementById('delete_provider_id').value = '';
+    }, 200);
+  }
+
+  // Initial run
+  document.addEventListener('DOMContentLoaded', () => {
+    toggleEmbeddingOptions();
+    togglePdfMetadataProvider();
+    toggleAddDirectUpload();
+    
+    // Setup edit provider button handlers
+    document.querySelectorAll('.edit-provider-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const paramsJson = this.getAttribute('data-provider-params') || '{}';
+        let params = {};
+        try {
+          params = JSON.parse(paramsJson);
+        } catch (e) {
+          params = {};
+        }
+        
+        const providerData = {
+          id: this.getAttribute('data-provider-id'),
+          name: this.getAttribute('data-provider-name'),
+          type: this.getAttribute('data-provider-type'),
+          base_url: this.getAttribute('data-provider-base-url'),
+          model_name: this.getAttribute('data-provider-model-name'),
+          api_key: this.getAttribute('data-provider-api-key'),
+          port: this.getAttribute('data-provider-port'),
+          params: params,
+          is_embedding_model: this.getAttribute('data-provider-is-embedding') === 'True',
+          accepts_image_input: this.getAttribute('data-provider-accepts-image-input') === 'True'
+        };
+        openEditProviderModal(providerData);
+      });
+    });
+    
+  });
+</script>
+
+{% endblock %}

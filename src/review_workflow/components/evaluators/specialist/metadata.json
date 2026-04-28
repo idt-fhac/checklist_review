@@ -1,0 +1,36 @@
+{
+  "id": "specialist",
+  "name": "specialist",
+  "display_name": "Specialist",
+  "description": "A topic expert that answers or analyzes content only within a configured topic, using configurable criteria.",
+  "type": "tool",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "tool_def",
+      "type": "object",
+      "description": "Tool definition config"
+    }
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "topic": {
+        "type": "string",
+        "label": "Topic",
+        "description": "The expert topic; the specialist answers only within this topic."
+      },
+      "criteria": {
+        "type": "string",
+        "label": "Criteria",
+        "description": "Criteria used by the agent to analyze the content."
+      },
+      "provider_id": {
+        "type": "string",
+        "label": "LLM Provider",
+        "description": "LLM Provider ID"
+      }
+    },
+    "required": ["provider_id"]
+  }
+}

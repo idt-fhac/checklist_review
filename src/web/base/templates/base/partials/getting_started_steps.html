@@ -1,0 +1,72 @@
+{# Expandable setup steps; used by Help modal and workspace welcome modal #}
+<div class="gs-step" data-gs-step>
+  <button type="button" class="gs-step-toggle" aria-expanded="false" data-gs-toggle>
+    <span class="gs-step-num" aria-hidden="true">1</span>
+    <span class="gs-step-heading">
+      <span class="gs-step-title">Connect an LLM provider</span>
+      <p class="gs-step-hint">Add API keys or local models in Settings.</p>
+    </span>
+    <svg class="gs-step-chevron" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>
+  </button>
+  <div class="gs-step-panel" data-gs-panel>
+    <div class="gs-step-panel-inner">
+      <div class="gs-step-detail">
+        <ul>
+          <li>Register providers such as OpenAI, Ollama, Gemini, or LiteLLM under <strong>LLM Providers</strong>.</li>
+          <li>Secrets stay in your workspace; you can duplicate a workspace to copy provider configuration.</li>
+          <li>Without a provider, checklist review and LLM-based PDF parsing cannot run.</li>
+        </ul>
+        <a class="gs-step-link" href="{{ url_for('settings.index') }}#settings-llm-providers">Open LLM providers
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="gs-step" data-gs-step>
+  <button type="button" class="gs-step-toggle" aria-expanded="false" data-gs-toggle>
+    <span class="gs-step-num" aria-hidden="true">2</span>
+    <span class="gs-step-heading">
+      <span class="gs-step-title">PDF metadata extraction</span>
+      <p class="gs-step-hint">Use an LLM for titles, authors, and abstracts.</p>
+    </span>
+    <svg class="gs-step-chevron" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>
+  </button>
+  <div class="gs-step-panel" data-gs-panel>
+    <div class="gs-step-panel-inner">
+      <div class="gs-step-detail">
+        <ul>
+          <li><strong>Rule-based</strong> mode is fast and offline but can miss messy PDF layouts.</li>
+          <li>Switch to <strong>LLM provider</strong> and choose which model parses each paper for richer metadata.</li>
+        </ul>
+        <a class="gs-step-link" href="{{ url_for('settings.index') }}#settings-pdf-metadata">Configure PDF metadata
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="gs-step" data-gs-step>
+  <button type="button" class="gs-step-toggle" aria-expanded="false" data-gs-toggle>
+    <span class="gs-step-num" aria-hidden="true">3</span>
+    <span class="gs-step-heading">
+      <span class="gs-step-title">Review process design</span>
+      <p class="gs-step-hint">Assign models to each workflow step.</p>
+    </span>
+    <svg class="gs-step-chevron" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/></svg>
+  </button>
+  <div class="gs-step-panel" data-gs-panel>
+    <div class="gs-step-panel-inner">
+      <div class="gs-step-detail">
+        <ul>
+          <li>Open <strong>Review Process Design</strong> to edit how papers flow through loaders, reviewers, and writers.</li>
+          <li>Each LLM-backed node can reference a specific provider for cost or quality tuning.</li>
+          <li>Start from the default template, then adjust for your team&apos;s checklist and models.</li>
+        </ul>
+        <a class="gs-step-link" href="{{ url_for('review_process_design.index') }}">Open process designer
+          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

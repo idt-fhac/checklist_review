@@ -1,0 +1,185 @@
+.sidebar {
+  min-height: 100vh;
+  box-shadow: none;
+  z-index: 1000;
+  background: #f8fafc;
+  border-right: none;
+  position: relative;
+  overflow-x: hidden;
+}
+.sidebar::before {
+  content: "";
+  position: absolute;
+  top: -110px;
+  right: -85px;
+  width: 260px;
+  height: 260px;
+  background: none;
+  pointer-events: none;
+}
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: 60px;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #d7e3f5;
+  pointer-events: none;
+}
+.sidebar-brand {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid #d7e3f5;
+  margin-bottom: 0.5rem;
+  background: #f8fafc;
+}
+.sidebar-brand a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.sidebar-brand a:hover {
+  transform: translateX(2px);
+}
+.sidebar-brand .brand-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+.sidebar-brand .brand-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+.nav-pills {
+  padding: 0.5rem 0.75rem;
+}
+.nav-pills .nav-link {
+  color: #334155;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.25rem;
+  font-weight: 550;
+  font-size: 0.9375rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  position: relative;
+  background-color: transparent;
+  border: 1px solid transparent;
+}
+.nav-pills .nav-link:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #0f172a;
+  border-color: rgba(37, 99, 235, 0.2);
+  transform: translateX(2px);
+}
+.nav-pills .nav-link.active {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow: 0 7px 16px rgba(37, 99, 235, 0.26);
+  border-color: rgba(147, 197, 253, 0.55);
+  font-weight: 600;
+}
+.nav-pills .nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 24px;
+  width: 4px;
+  background-color: #60a5fa;
+  border-radius: 0 4px 4px 0;
+}
+.nav-pills .nav-link.active svg {
+  color: #ffffff;
+}
+.nav-pills .nav-link svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.nav-pills .nav-link:not(.active) svg {
+  color: #64748b;
+}
+.nav-pills .nav-link:hover:not(.active) svg {
+  color: #1e40af;
+}
+.nav-pills .nav-link:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+.sidebar-divider {
+  margin: 1rem 0.75rem;
+  border: none;
+  border-top: 1px solid #d7e3f5;
+}
+.sidebar-footer {
+  padding: 1rem 0.75rem;
+  margin-top: auto;
+}
+.sidebar-footer .nav-link {
+  color: #64748b;
+}
+.sidebar-footer .nav-link:hover {
+  color: #0f172a;
+}
+.sidebar-footer .nav-link.active {
+  color: #ffffff;
+}
+/* Scrollbar styling */
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: #c5d4eb;
+  border-radius: 3px;
+}
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #9fb4d3;
+}
+
+.app-topbar {
+  height: 60px;
+  z-index: 1030;
+  background: #f8fafc;
+  border-bottom: 1px solid #d7e3f5;
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+}
+.app-topbar .text-muted {
+  color: #64748b !important;
+}
+.app-topbar .text-dark {
+  color: #0f172a !important;
+}
+.app-topbar #workspaceDropdown {
+  background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%) !important;
+  border: 1px solid rgba(147, 197, 253, 0.8);
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.25) !important;
+}
+.app-topbar #workspaceDropdown:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.34) !important;
+}

@@ -1,0 +1,194 @@
+{
+  "nodes": [
+    {
+      "data": {
+        "category": "pre_process",
+        "component_id": "paper_loader",
+        "config": {
+          "extraction_method": "Extracted Content",
+          "force_execution": false
+        },
+        "config_schema": {
+          "properties": {
+            "extract_pages_as_image": {
+              "default": false,
+              "description": "Convert each page to a PNG file.",
+              "label": "Extract Pages as Image",
+              "type": "boolean"
+            },
+            "extraction_method": {
+              "default": "Extracted Content",
+              "description": "'Extracted Content' uses existing MD from source_extracted. 'Force Re-Extract' converts the PDF to markdown using the same method as the collection.",
+              "enum": [
+                "Extracted Content",
+                "Force Re-Extract"
+              ],
+              "label": "Extraction Method",
+              "type": "string"
+            },
+            "force_execution": {
+              "default": false,
+              "description": "Force re-extraction even if the output file already exists",
+              "label": "Force Execution",
+              "type": "boolean",
+              "ui:if": {
+                "extraction_method": "Direct File Upload"
+              }
+            }
+          },
+          "required": [
+            "extraction_method"
+          ],
+          "type": "object"
+        },
+        "label": "Paper Loader"
+      },
+      "height": 345,
+      "id": "1",
+      "type": "custom",
+      "width": 280
+    },
+    {
+      "data": {
+        "category": "review",
+        "component_id": "question_reviewer",
+        "config": {
+          "force_review": true,
+          "system_prompt": "You are supposed to answer the questions based on the paper content."
+        },
+        "config_schema": {
+          "properties": {
+            "answer_all_together": {
+              "default": false,
+              "description": "When enabled, all questions are answered in a single LLM call. When disabled, questions are answered one by one.",
+              "label": "Answer All Questions Together",
+              "type": "boolean"
+            },
+            "force_review": {
+              "default": false,
+              "description": "Force re-review even if answer exists",
+              "label": "Force Re-Review",
+              "type": "boolean"
+            },
+            "provider_id": {
+              "description": "LLM Provider ID",
+              "label": "LLM Provider",
+              "type": "string"
+            },
+            "rag_chunking_strategy": {
+              "default": "page",
+              "description": "Chunking strategy: page or paragraph",
+              "enum": [
+                "page",
+                "paragraph"
+              ],
+              "label": "RAG Strategy",
+              "type": "string",
+              "ui:if": {
+                "answer_all_together": {
+                  "$ne": true
+                },
+                "use_rag": true
+              }
+            },
+            "rag_embedding_provider_id": {
+              "description": "Required when using RAG. Select an embedding model provider (only embedding models are listed).",
+              "label": "Embedding Provider",
+              "type": "string",
+              "ui:if": {
+                "answer_all_together": {
+                  "$ne": true
+                },
+                "use_rag": true
+              }
+            },
+            "rag_top_k": {
+              "default": 5,
+              "description": "Number of chunks to retrieve",
+              "label": "Number of Chunks",
+              "minimum": 1,
+              "type": "integer",
+              "ui:if": {
+                "answer_all_together": {
+                  "$ne": true
+                },
+                "use_rag": true
+              }
+            },
+            "system_prompt": {
+              "default": "You are a rigorous scientific reviewer.",
+              "description": "System prompt for the reviewer agent",
+              "label": "System Prompt",
+              "type": "string"
+            },
+            "use_rag": {
+              "default": false,
+              "description": "Enable RAG-based question answering (only available when answering questions one by one)",
+              "label": "Use RAG",
+              "type": "boolean",
+              "ui:if": {
+                "answer_all_together": {
+                  "$ne": true
+                }
+              }
+            }
+          },
+          "required": [
+            "provider_id"
+          ],
+          "type": "object"
+        },
+        "label": "Question Reviewer"
+      },
+      "height": 579,
+      "id": "3",
+      "type": "custom",
+      "width": 280
+    },
+    {
+      "id": "pdf_writer_1775833343692",
+      "type": "custom",
+      "data": {
+        "label": "PDF Writer",
+        "component_id": "pdf_writer",
+        "category": "post_process",
+        "config_schema": {
+          "properties": {
+            "save_details": {
+              "default": false,
+              "description": "Include supporting_texts from answers.json for each question, shown in a readable format.",
+              "title": "Save Details",
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "config": {},
+        "id": "pdf_writer_1775833343692"
+      },
+      "width": 280,
+      "height": 215
+    }
+  ],
+  "edges": [
+    {
+      "className": "animated",
+      "id": "e1-3",
+      "source": "1",
+      "sourceHandle": "out",
+      "target": "3",
+      "targetHandle": "in",
+      "type": "smoothstep"
+    },
+    {
+      "source": "3",
+      "sourceHandle": "out",
+      "target": "pdf_writer_1775833343692",
+      "targetHandle": "in",
+      "className": "animated",
+      "type": "smoothstep",
+      "id": "reactflow__edge-3out-pdf_writer_1775833343692in"
+    }
+  ],
+  "name": "Demo Process"
+}

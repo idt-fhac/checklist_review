@@ -1,0 +1,279 @@
+{% extends "base/base.html" %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="{{ url_for('analysis.analysis_static', filename='css/analysis.css') }}" />
+
+<div class="container-fluid pt-0 pb-4">
+    <!-- Selection Interface -->
+    <div class="selection-card mb-4">
+        <div class="row g-0">
+            <!-- Collection Selection -->
+            <div class="col-md-4" id="collectionColumn">
+                <div class="selection-section" style="display: flex; flex-direction: column;">
+                    <label style="margin-bottom: 0.75rem; padding: 0 1rem; padding-top: 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" style="width: 16px; height: 16px; margin-right: 0.5rem;">
+                            <path d="M13 0H6a2 2 0 0 0-2 2 2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2 2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m0 13V4a2 2 0 0 0-2-2H5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M3 4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>
+                        </svg>
+                        Step 1: Select Collection
+                    </label>
+                    <div class="collection-list-container mb-3" style="height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: white; margin: 0 1rem; margin-bottom: 1rem;">
+                        <div class="list-group list-group-flush" id="collectionList">
+                            <!-- Collections will be dynamically loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Checklist Selection -->
+            <div class="col-md-4" id="checklistColumn" style="display: none;">
+                <div class="selection-section" style="display: flex; flex-direction: column;">
+                    <label style="margin-bottom: 0.75rem; padding: 0 1rem; padding-top: 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" style="width: 16px; height: 16px; margin-right: 0.5rem;">
+                            <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                            <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/>
+                        </svg>
+                        Step 2: Select Checklist
+                    </label>
+                    <div class="checklist-list-container mb-3" style="height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: white; margin: 0 1rem; margin-bottom: 1rem;">
+                        <div class="list-group list-group-flush" id="checklistList">
+                            <div class="text-center p-4" style="color: #64748b;">
+                                <div style="font-size: 0.85rem;">Select a collection first...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Process Selection -->
+            <div class="col-md-4" id="processColumn" style="display: none;">
+                <div class="selection-section" style="display: flex; flex-direction: column;">
+                    <label style="margin-bottom: 0.75rem; padding: 0 1rem; padding-top: 1rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16" style="width: 16px; height: 16px; margin-right: 0.5rem;">
+                            <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1h12zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H2z"/>
+                            <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                        </svg>
+                        Step 3: Select Process
+                    </label>
+                    <div class="process-list-container mb-3" style="height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: white; margin: 0 1rem; margin-bottom: 1rem;">
+                        <div class="list-group list-group-flush" id="processList">
+                            <div class="text-center p-4" style="color: #64748b;">
+                                <div style="font-size: 0.85rem;">Select a checklist first...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Button -->
+        <div class="p-3 text-center border-top bg-light" style="border-radius: 0 0 12px 12px;">
+            <button class="btn btn-primary load-report-btn" type="button" id="loadBtn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="me-2" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+                </svg>
+                Load Report
+            </button>
+            <div class="d-flex justify-content-center mt-3">
+                <button type="button" class="btn btn-sm btn-outline-secondary panel-toggle-btn" id="panelToggleBtn" aria-label="Toggle selection panel">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" id="toggleIcon">
+                        <path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Collapsed Toggle Container (shown when panel is collapsed) -->
+    <div class="collapsed-toggle-container" id="collapsedToggleContainer">
+        <button type="button" class="btn btn-sm btn-outline-secondary panel-toggle-btn" id="collapsedToggleBtn" aria-label="Show selection panel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Main Content Area (Hidden until loaded) -->
+    <div id="dashboard" style="display: none;">
+        <!-- Section heading: clear two-column layout -->
+        <div class="dashboard-section-heading mb-3">
+            <h2 class="dashboard-title">Analysis Report</h2>
+            <p class="dashboard-subtitle">Automated review results and human verification comparison</p>
+        </div>
+
+        <div class="row g-4 dashboard-row">
+            <!-- Left: Automated response analysis -->
+            <div class="col-lg-6">
+                <div class="analysis-panel analysis-panel-automated">
+                    <div class="analysis-panel-header">
+                        <div class="analysis-panel-header-main">
+                            <div class="analysis-panel-icon analysis-panel-icon-automated" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                    <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 4.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-5ZM4 5v3h2V5H4Zm3 0v3h2V5H7Zm2 4H6v1h3V9Zm0 1h1v1H9v-1Zm-2 0v-1H6v1H4Zm-1-1v1H3V9h1Zm4 0h1v1H8v-1Zm1 0v1h1v-1h-1Zm-1-2h1v1H8V7Zm-2 0v1H6V7H4Zm-1 0H3v1h1V7Z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="analysis-panel-title">Automated response analysis</h3>
+                                <p class="analysis-panel-desc">AI-generated Yes/No answers across papers and questions</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary analysis-export-btn" id="exportAutomatedBtn" title="Export automated stats as JSON" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg>
+                            Export
+                        </button>
+                    </div>
+                    <div class="analysis-panel-body">
+                        <div class="panel-stats-strip panel-stats-automated">
+                            <div class="panel-stat">
+                                <span class="panel-stat-value" id="statTotalPapers">-</span>
+                                <span class="panel-stat-label">Papers reviewed</span>
+                            </div>
+                            <div class="panel-stat-divider" aria-hidden="true"></div>
+                            <div class="panel-stat">
+                                <span class="panel-stat-value panel-stat-value-accent" id="statYesRate">-</span>
+                                <span class="panel-stat-label">Yes rate</span>
+                            </div>
+                        </div>
+                        <div class="automated-viz-section">
+                            <div class="automated-viz-overall mb-3" id="automatedOverallSummary">
+                                <div class="section-title mb-2">Overall answer distribution</div>
+                                <div class="overall-bar-wrap">
+                                    <div class="overall-bar" id="overallBar" role="img" aria-label="Yes and No distribution">
+                                        <span class="overall-bar-segment overall-bar-yes" id="overallBarYes" style="width: 0%"></span>
+                                        <span class="overall-bar-segment overall-bar-no" id="overallBarNo" style="width: 0%"></span>
+                                    </div>
+                                    <div class="overall-legend" id="overallLegend"><!-- filled by JS --></div>
+                                </div>
+                            </div>
+                            <div class="section-title mb-2">Yes vs No by question</div>
+                            <p class="automated-viz-desc text-muted small mb-2">Each bar shows the share of Yes (green) and No (red) answers for that question across all papers. Sorted by Yes rate.</p>
+                            <div class="panel-chart-wrap panel-chart-wrap-stacked mb-3" style="min-height: 220px;">
+                                <canvas id="automatedChartStacked"></canvas>
+                            </div>
+                            <div class="section-title mb-2">Yes rate by question (detail)</div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Question</th>
+                                        <th class="text-end">Yes %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="automatedTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Human verification analysis -->
+            <div class="col-lg-6">
+                <div class="analysis-panel analysis-panel-human">
+                    <div class="analysis-panel-header">
+                        <div class="analysis-panel-header-main">
+                            <div class="analysis-panel-icon analysis-panel-icon-human" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="analysis-panel-title">Human verification analysis</h3>
+                                <p class="analysis-panel-desc">Where reviewers checked the AI and agreed or disagreed</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary analysis-export-btn" id="exportHumanBtn" title="Export verification stats as JSON" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="me-1" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg>
+                            Export
+                        </button>
+                    </div>
+                    <div class="analysis-panel-body">
+                        <div class="panel-stats-strip panel-stats-human">
+                            <div class="panel-stat">
+                                <span class="panel-stat-value" id="statVerifiedCount">-</span>
+                                <span class="panel-stat-label">Papers verified</span>
+                            </div>
+                            <div class="panel-stat-divider" aria-hidden="true"></div>
+                            <div class="panel-stat">
+                                <span class="panel-stat-value" id="statVerifiedPct">-</span>
+                                <span class="panel-stat-label">Coverage</span>
+                            </div>
+                            <div class="panel-stat-divider" aria-hidden="true"></div>
+                            <div class="panel-stat">
+                                <span class="panel-stat-value panel-stat-value-accent" id="statAgreement">-</span>
+                                <span class="panel-stat-label">Agreement</span>
+                            </div>
+                        </div>
+                        <div class="row mb-4 align-items-center">
+                            <div class="col-md-6 panel-chart-wrap panel-chart-wrap-sm">
+                                <canvas id="humanChart"></canvas>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="human-legend">
+                                    <div class="human-legend-item">
+                                        <span class="human-legend-dot human-legend-agreed"></span>
+                                        <div>
+                                            <strong>Agreed</strong> — AI answer was correct
+                                        </div>
+                                    </div>
+                                    <div class="human-legend-item">
+                                        <span class="human-legend-dot human-legend-disagreed"></span>
+                                        <div>
+                                            <strong>Disagreed</strong> — Reviewer corrected the AI
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="section-title mb-2">Verification by question</div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Question</th>
+                                        <th class="text-center">Verified</th>
+                                        <th class="text-end">Accuracy</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="verificationTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-state" style="display: none;">
+        <div class="loading-spinner"></div>
+        <h5 class="fw-semibold mb-2" style="color: #0f172a;">Crunching the numbers...</h5>
+        <p class="text-muted mb-0">Analyzing your data and generating insights</p>
+    </div>
+    
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state">
+        <svg class="empty-state-icon analysis-ready-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true">
+            <defs>
+                <linearGradient id="analysisReadyIconGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#3b82f6"/>
+                    <stop offset="100%" stop-color="#1d4ed8"/>
+                </linearGradient>
+            </defs>
+            <circle cx="8" cy="8" r="8" fill="url(#analysisReadyIconGradient)"/>
+            <circle cx="8" cy="8" r="6.2" fill="#eff6ff" opacity="0.18"/>
+            <path fill="#ffffff" d="M4.05 11.15h7.9a.45.45 0 1 1 0 .9h-7.9a.45.45 0 0 1 0-.9m.55-1.1H6.1a.22.22 0 0 0 .22-.22V7.55a.22.22 0 0 0-.22-.22H4.6a.22.22 0 0 0-.22.22v2.28c0 .12.1.22.22.22m2.65 0h1.5a.22.22 0 0 0 .22-.22V6.25a.22.22 0 0 0-.22-.22h-1.5a.22.22 0 0 0-.22.22v3.58c0 .12.1.22.22.22m2.65 0h1.5a.22.22 0 0 0 .22-.22V8.2a.22.22 0 0 0-.22-.22h-1.5a.22.22 0 0 0-.22.22v1.63c0 .12.1.22.22.22M4.58 5.42l1.52 1.1 2.08-1.78 1.68.98a.45.45 0 1 0 .45-.78l-1.95-1.14a.45.45 0 0 0-.54.06L6.08 5.35l-1.02-.74a.45.45 0 0 0-.48.8"/>
+        </svg>
+        <h4 class="fw-semibold mb-3" style="color: #0f172a;">Ready to Analyze</h4>
+        <p class="mb-4" style="max-width: 500px; margin-left: auto; margin-right: auto;">Select a collection and process from above to generate a comprehensive analysis report.</p>
+        <div class="d-flex justify-content-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#2563eb" viewBox="0 0 16 16">
+                <path d="M13 0H6a2 2 0 0 0-2 2 2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2 2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m0 13V4a2 2 0 0 0-2-2H5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M3 4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>
+            </svg>
+            <span style="color: #64748b; font-size: 0.9rem;">Follow the steps above to get started</span>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('analysis.analysis_static', filename='js/analysis.js') }}"></script>
+{% endblock %}

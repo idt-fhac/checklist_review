@@ -1,0 +1,229 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Manage Workspaces</h2>
+    </div>
+
+    <div class="row">
+        <!-- Workspace List -->
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                    <h5 class="mb-0">Your Workspaces</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ws in workspaces %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="d-flex align-items-center justify-content-center bg-primary text-white rounded-circle me-3" style="width: 40px; height: 40px; font-weight: bold; font-size: 1.2rem;">
+                                                {{ ws[0]|upper }}
+                                            </div>
+                                            <span class="fw-medium">{{ ws }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if ws == active_workspace %}
+                                        <span class="badge bg-success rounded-pill px-3 py-2">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary rounded-pill px-3 py-2">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        {% if ws != active_workspace %}
+                                        <form action="{{ url_for('workspace.switch_workspace') }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="workspace_name" value="{{ ws }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary px-3">Switch</button>
+                                        </form>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary px-3" disabled>Current</button>
+                                        {% endif %}
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary px-3 ms-1"
+                                                title="Create a new workspace with the same settings and API keys"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#duplicateWorkspaceModal"
+                                                data-source-workspace="{{ ws | e }}">
+                                            Duplicate…
+                                        </button>
+                                        
+                                        {% if ws != "guest" %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger px-3 ms-1"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteWorkspaceModal"
+                                                data-workspace="{{ ws | e }}">
+                                            Delete
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Workspace -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                    <h5 class="mb-0">Create Workspace</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('workspace.create_new_workspace') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="workspace_name" class="form-label text-muted">Workspace Name</label>
+                            <input type="text" class="form-control form-control-lg" id="workspace_name" name="workspace_name" placeholder="e.g. My Project" required>
+                        </div>
+                        <p class="text-muted small mb-3">New workspaces start from the built-in template (TF-IDF, rule-based PDF metadata, no LLM providers). The name <code>defaults</code> is reserved.</p>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Create New Workspace</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Welcome onboarding: shown once after creating a new workspace -->
+<div class="modal fade app-onboarding" id="newWorkspaceWelcomeModal" tabindex="-1" aria-labelledby="newWorkspaceWelcomeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 480px;">
+    <div class="modal-content">
+      <div class="gs-header">
+        <div class="gs-header-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+            <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/>
+          </svg>
+        </div>
+        <h2 class="gs-title" id="newWorkspaceWelcomeModalLabel">Workspace ready</h2>
+        <p class="gs-sub">Your workspace uses the default template. Expand each step for details, then jump to Settings or Process Design.</p>
+      </div>
+      <div class="modal-body">
+        {% include 'base/partials/getting_started_steps.html' %}
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-gs-primary" data-bs-dismiss="modal">Continue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate workspace: copies settings + secrets; processes/checklists from template -->
+<div class="modal fade" id="duplicateWorkspaceModal" tabindex="-1" aria-labelledby="duplicateWorkspaceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="duplicateWorkspaceModalLabel">Duplicate workspace</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('workspace.post_duplicate_workspace') }}" method="POST" id="duplicateWorkspaceForm">
+        <div class="modal-body">
+          <p class="text-muted small mb-3" id="duplicateWorkspaceHelp">
+            Creates a new empty workspace. <strong>Settings</strong> and <strong>secrets</strong> (LLM providers) are copied from the workspace you picked. Checklists and process definitions come from the default template.
+          </p>
+          <input type="hidden" name="source_workspace_name" id="duplicate_source_workspace" value="">
+          <div class="mb-3">
+            <label for="duplicate_new_workspace_name" class="form-label">New workspace name</label>
+            <input type="text" class="form-control" name="new_workspace_name" id="duplicate_new_workspace_name" placeholder="e.g. My Project (copy)" required autocomplete="off">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create copy</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete workspace -->
+<div class="modal fade" id="deleteWorkspaceModal" tabindex="-1" aria-labelledby="deleteWorkspaceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteWorkspaceModalLabel">Delete workspace</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ url_for('workspace.delete_existing_workspace') }}" method="POST" id="deleteWorkspaceForm">
+        <div class="modal-body">
+          <p class="mb-2">
+            Are you sure you want to delete the workspace <strong id="delete_workspace_name_display"></strong>?
+          </p>
+          <p class="text-muted small mb-0">
+            This will permanently delete all collections, checklists, and settings in this workspace. This action cannot be undone.
+          </p>
+          <input type="hidden" name="workspace_name" id="delete_workspace_name" value="">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger" style="background: #ef4444; border-color: #ef4444;">Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('duplicateWorkspaceModal').addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    if (!button || !button.getAttribute) return;
+    const source = button.getAttribute('data-source-workspace') || '';
+    document.getElementById('duplicate_source_workspace').value = source;
+    const title = document.getElementById('duplicateWorkspaceModalLabel');
+    if (title) title.textContent = source ? ('Duplicate workspace: ' + source) : 'Duplicate workspace';
+    const nameInput = document.getElementById('duplicate_new_workspace_name');
+    if (nameInput) {
+      nameInput.value = '';
+      requestAnimationFrame(function () { nameInput.focus(); });
+    }
+  });
+
+  document.getElementById('deleteWorkspaceModal').addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    if (!button || !button.getAttribute) return;
+    const ws = button.getAttribute('data-workspace') || '';
+    document.getElementById('delete_workspace_name').value = ws;
+    const nameDisplay = document.getElementById('delete_workspace_name_display');
+    if (nameDisplay) nameDisplay.textContent = ws;
+    const title = document.getElementById('deleteWorkspaceModalLabel');
+    if (title) title.textContent = ws ? ('Delete workspace: ' + ws) : 'Delete workspace';
+  });
+
+  {% if show_workspace_onboarding %}
+  document.addEventListener('DOMContentLoaded', function () {
+    var welcomeEl = document.getElementById('newWorkspaceWelcomeModal');
+    if (welcomeEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      var modal = new bootstrap.Modal(welcomeEl);
+      welcomeEl.addEventListener('shown.bs.modal', function onWelcomeShown() {
+        welcomeEl.removeEventListener('shown.bs.modal', onWelcomeShown);
+        var first = welcomeEl.querySelector('[data-gs-step]');
+        if (first) {
+          first.classList.add('is-open');
+          var t = first.querySelector('[data-gs-toggle]');
+          if (t) t.setAttribute('aria-expanded', 'true');
+        }
+      });
+      requestAnimationFrame(function () { modal.show(); });
+    }
+  });
+  {% endif %}
+</script>
+{% endblock %}

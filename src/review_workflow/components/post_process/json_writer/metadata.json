@@ -1,0 +1,25 @@
+{
+  "id": "json_writer",
+  "name": "JSON Writer",
+  "type": "post_process",
+  "description": "Generates a JSON report from review answers found in answers.json.",
+  "inputs": [
+    {"name": "collection_name", "type": "string", "description": "Name of the collection"},
+    {"name": "review_process_name", "type": "string", "description": "Name of the review process instance"},
+    {"name": "paper_name", "type": "string", "description": "Name of the paper file (folder)"}
+  ],
+  "outputs": [
+    {"name": "file_path", "type": "string", "description": "Path to the generated JSON file"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "save_details": {
+        "type": "boolean",
+        "title": "Save Details",
+        "description": "Include supporting_texts from answers.json for each question.",
+        "default": false
+      }
+    }
+  }
+}

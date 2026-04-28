@@ -1,0 +1,66 @@
+# Workspaces (User Data)
+workspaces/*
+!workspaces/guest/
+# Template workspace: track all files (overrides the ignores below)
+!workspaces/defaults/
+!workspaces/defaults/**
+
+# Per-workspace settings (user-specific); keep defaults template tracked
+workspaces/**/config/settings.json
+!workspaces/defaults/config/settings.json
+
+# API keys / LLM providers — never commit (template under defaults may ship an empty file)
+workspaces/**/config/secrets.json
+!workspaces/defaults/config/secrets.json
+
+# Guest config is local-only
+workspaces/guest/config/*
+
+# Guest Collections: ignore all
+workspaces/guest/collections/*
+!workspaces/guest/collections/.gitkeep
+
+# Guest Checklists: ignore all except defaults
+workspaces/guest/checklists/*
+
+# Guest Process Definitions: ignore all except defaults
+workspaces/guest/process_definitions/*
+!workspaces/guest/process_definitions/default_review.json
+
+# Guest Review Tasks: ignore all
+workspaces/guest/.review_tasks/*
+
+# Temp files
+temp/
+
+# Python cache / virtualenv
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+ENV/
+.env
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Dependency / build artifacts
+pip-wheel-metadata/
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Local data & outputs
+/data/
+/outputs/
+logs/
+
+# Config overrides
+.env.local

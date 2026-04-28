@@ -1,0 +1,26 @@
+{
+  "id": "figure_reviewer",
+  "name": "figure_reviewer",
+  "display_name": "Figure Reviewer",
+  "description": "Reviews figures on given PDF pages by feeding page images and a question to a multimodal agent.",
+  "type": "tool",
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "tool_def",
+      "type": "object",
+      "description": "Tool definition config"
+    }
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "provider_id": {
+        "type": "string",
+        "label": "LLM Provider",
+        "description": "Multimodal LLM provider ID (must support image input)."
+      }
+    },
+    "required": ["provider_id"]
+  }
+}

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Checklist Reviewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('base.static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('base.static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('base.static', filename='css/help-onboarding.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  </head>
+  <body>
+    <div class="d-flex w-100">
+      <!-- Sidebar -->
+      <nav class="d-flex flex-column flex-shrink-0 sidebar" style="width: 280px; position: fixed; top: 0; bottom: 0; overflow-y: auto;">
+        <!-- Brand -->
+        <div class="sidebar-brand">
+          <a href="/" class="text-decoration-none">
+            <div class="brand-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="white" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"/>
+              </svg>
+            </div>
+            <span class="brand-text">Checklist Reviewer</span>
+          </a>
+        </div>
+        
+        <!-- Navigation -->
+        <ul class="nav nav-pills flex-column mb-auto mt-1">
+          <li class="nav-item">
+            <a href="{{ url_for('collection.index') }}" class="nav-link {% if active_tab == 'collection' %}active{% endif %}" aria-current="page">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M13 0H6a2 2 0 0 0-2 2 2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2 2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m0 13V4a2 2 0 0 0-2-2H5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1M3 4a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>
+              </svg>
+              Collections
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('checklist_review.index') }}" class="nav-link {% if active_tab == 'checklist_review' %}active{% endif %}">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M3 14.5A1.5 1.5 0 0 1 1.5 13V3A1.5 1.5 0 0 1 3 1.5h8a.5.5 0 0 1 0 1H3a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5V8a.5.5 0 0 1 1 0v5a1.5 1.5 0 0 1-1.5 1.5z"/>
+                <path d="m8.354 10.354 7-7a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0"/>
+              </svg>
+              Checklist Review
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('human_verification.index') }}" class="nav-link {% if active_tab == 'human_verification' %}active{% endif %}">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m1.679-4.493-1.335 2.226a.75.75 0 0 1-1.174.144l-.774-.773a.5.5 0 0 1 .708-.708l.547.548 1.17-1.951a.5.5 0 1 1 .858.514M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+                <path d="M8.256 14a4.5 4.5 0 0 1-.229-1.004H3c.001-.246.154-.986.832-1.664C4.484 10.68 5.711 10 8 10q.39 0 .74.025c.226-.341.496-.65.804-.918C8.844 9.002 7.848 9 8 9c-5 0-6 3-6 4s1 1 1 1z"/>
+              </svg>
+              Human Verification
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('analysis.index') }}" class="nav-link {% if active_tab == 'analysis' %}active{% endif %}">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/>
+              </svg>
+              Analysis
+            </a>
+          </li>
+        </ul>
+
+        <!-- Footer Section -->
+        <div class="sidebar-footer">
+          <hr class="sidebar-divider">
+          <ul class="nav nav-pills flex-column mb-3">
+            <li class="nav-item">
+              <a href="{{ url_for('review_process_design.index') }}" class="nav-link {% if active_tab == 'review_process_design' %}active{% endif %}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M0 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1zm2 4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/>
+                </svg>
+                Review Process Design
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ url_for('settings.index') }}" class="nav-link {% if active_tab == 'settings' %}active{% endif %}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+                  <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+                </svg>
+                Settings
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <div class="flex-grow-1 d-flex flex-column" style="margin-left: 280px; min-height: 100vh;">
+        <!-- Top Bar -->
+        <header class="app-topbar d-flex justify-content-between align-items-center py-2 px-4">
+          <div class="d-flex align-items-center">
+            <!-- Optional: Breadcrumbs or page title could go here -->
+          </div>
+          
+          <div class="d-flex align-items-center gap-3">
+            <span class="text-muted small fw-medium">Workspace: <span class="text-dark">{{ active_workspace }}</span></span>
+
+            <div class="app-help-wrap">
+              <button type="button" class="app-help-btn" id="appHelpButton" data-bs-toggle="modal" data-bs-target="#appHelpModal" aria-label="Help: getting started">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                  <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+                </svg>
+                Help
+              </button>
+              <div class="app-help-hint" id="appHelpHint" aria-live="polite">
+                <div class="app-help-hint-arrow" aria-hidden="true"></div>
+                <div class="app-help-hint-bubble">
+                  New here? Use <strong>Help</strong> for setup steps anytime.
+                </div>
+                <button type="button" class="app-help-hint-dismiss" id="appHelpHintDismiss">Dismiss</button>
+              </div>
+            </div>
+            
+            <!-- Workspace Dropdown -->
+            <div class="dropdown">
+              <a href="#" class="d-flex align-items-center justify-content-center bg-primary text-white rounded-circle text-decoration-none shadow-sm" id="workspaceDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="width: 36px; height: 36px; font-weight: bold; font-size: 1.1rem; transition: all 0.2s ease;" title="{{ active_workspace }}">
+                {{ active_workspace[0]|upper if active_workspace else 'W' }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="workspaceDropdown" style="border-radius: 8px;">
+                <li><h6 class="dropdown-header text-uppercase fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">Switch Workspace</h6></li>
+                {% for ws in workspaces %}
+                  {% if ws != active_workspace %}
+                    <li>
+                      <form action="{{ url_for('workspace.switch_workspace') }}" method="POST" class="m-0 p-0">
+                        <input type="hidden" name="workspace_name" value="{{ ws }}">
+                        <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2">
+                          <div class="bg-light text-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; font-size: 0.75rem; font-weight: bold;">
+                            {{ ws[0]|upper }}
+                          </div>
+                          {{ ws }}
+                        </button>
+                      </form>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item d-flex align-items-center gap-2 py-2 text-primary" href="{{ url_for('workspace.manage') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+                      <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+                    </svg>
+                    Manage Workspaces
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </header>
+
+        <main class="flex-grow-1 container-fluid py-4 px-4 overflow-hidden d-flex flex-column">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, msg in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ msg }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+
+    <div class="modal fade app-onboarding" id="appHelpModal" tabindex="-1" aria-labelledby="appHelpModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 480px;">
+        <div class="modal-content">
+          <div class="gs-header">
+            <div class="gs-header-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+              </svg>
+            </div>
+            <h2 class="gs-title" id="appHelpModalLabel">Getting started</h2>
+            <p class="gs-sub">Configure your workspace in three steps. Tap a row for details.</p>
+          </div>
+          <div class="modal-body">
+            {% include 'base/partials/getting_started_steps.html' %}
+          </div>
+          <div class="modal-footer d-flex justify-content-between align-items-center">
+            <div class="form-check m-0">
+              <input class="form-check-input" type="checkbox" value="1" id="disableHelpAttraction">
+              <label class="form-check-label text-muted small" for="disableHelpAttraction">
+                Disable Help button attention animation
+              </label>
+            </div>
+            <button type="button" class="btn btn-gs-primary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('base.static', filename='js/base.js') }}"></script>
+  </body>
+</html>

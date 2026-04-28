@@ -1,0 +1,8 @@
+{
+  "embedding_model_type": "tfidf",
+  "default_page": "checklist_review",
+  "pdf_metadata_extraction_method": "rule_based",
+  "show_canvas_by_default": false,
+  "pdf_processing_llm_provider_id": null,
+  "checklist_extraction_llm_provider_id": null
+}

@@ -1,0 +1,118 @@
+{
+  "id": "question_reviewer",
+  "name": "Question Reviewer",
+  "type": "review",
+  "description": "Reviews a question against paper content using an LLM, supporting text and file-based inputs.",
+  "inputs": [
+    {
+      "name": "collection_name", 
+      "type": "string",
+      "description": "Name of the collection"
+    },
+    {
+      "name": "review_process_name", 
+      "type": "string",
+      "description": "Name of the review process instance"
+    },
+    {
+      "name": "paper_name", 
+      "type": "string",
+      "description": "Name of the paper file (used for output path)"
+    },
+    {
+      "name": "question", 
+      "type": "object", 
+      "description": "Question object containing 'id', 'text', and optional 'type'/'content'"
+    },
+    {
+      "name": "paper_content", 
+      "type": "object", 
+      "description": "Paper content object containing 'type' and 'content'"
+    },
+    {
+      "name": "tools",
+      "type": "array",
+      "description": "List of tool definitions to enable"
+    }
+  ],
+  "outputs": [
+    {"name": "review_result", "type": "string"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "provider_id": { 
+        "type": "string", 
+        "label": "LLM Provider",
+        "description": "LLM Provider ID" 
+      },
+      "system_prompt": { 
+        "type": "string", 
+        "default": "You are a rigorous scientific reviewer.",
+        "label": "System Prompt",
+        "description": "System prompt for the reviewer agent"
+      },
+      "force_review": {
+        "type": "boolean",
+        "default": false,
+        "label": "Force Re-Review",
+        "description": "Force re-review even if answer exists"
+      },
+      "answer_all_together": {
+        "type": "boolean",
+        "default": false,
+        "label": "Answer All Questions Together",
+        "description": "When enabled, all questions are answered in a single LLM call. When disabled, questions are answered one by one."
+      },
+      "use_rag": {
+        "type": "boolean",
+        "default": false,
+        "label": "Use RAG",
+        "description": "Enable RAG-based question answering (only available when answering questions one by one)",
+        "ui:if": {
+          "answer_all_together": {
+            "$ne": true
+          }
+        }
+      },
+      "rag_chunking_strategy": {
+        "type": "string",
+        "default": "page",
+        "enum": ["page", "paragraph"],
+        "label": "RAG Strategy",
+        "description": "Chunking strategy: page or paragraph",
+        "ui:if": {
+          "use_rag": true,
+          "answer_all_together": {
+            "$ne": true
+          }
+        }
+      },
+      "rag_top_k": {
+        "type": "integer",
+        "default": 5,
+        "minimum": 1,
+        "label": "Number of Chunks",
+        "description": "Number of chunks to retrieve",
+        "ui:if": {
+          "use_rag": true,
+          "answer_all_together": {
+            "$ne": true
+          }
+        }
+      },
+      "rag_embedding_provider_id": {
+        "type": "string",
+        "label": "Embedding Provider",
+        "description": "Required when using RAG. Select an embedding model provider (only embedding models are listed).",
+        "ui:if": {
+          "use_rag": true,
+          "answer_all_together": {
+            "$ne": true
+          }
+        }
+      }
+    },
+    "required": ["provider_id"]
+  }
+}
