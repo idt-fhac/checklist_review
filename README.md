@@ -72,9 +72,19 @@ This toolkit is developed at the **Institute for Materials Data Science and Info
 
 **[DKZ.2R](https://www.dkz2r.de)** is the Rhine-Ruhr Center for Scientific Data Literacy and one of Germany’s eleven data literacy centers. Further information: **[dkz2r.de](https://www.dkz2r.de)**.
 
-
-| [![IAS-9](assets/logo_ias9.png)](https://www.fz-juelich.de/en/ias/ias-9) | [![Forschungszentrum Jülich](assets/logo_fzj.png)](https://www.fz-juelich.de/en) | [![DKZ.2R](assets/logo_dkz.png)](https://www.dkz2r.de) |
-| :--: | :--: | :--: |
+<table>
+  <tr>
+    <td align="center" valign="middle">
+      <a href="https://www.fz-juelich.de/en/ias/ias-9"><img src="assets/logo_ias9.png" alt="Institute for Materials Data Science and Informatics (IAS-9)" height="48"></a>
+    </td>
+    <td align="center" valign="middle">
+      <a href="https://www.fz-juelich.de/en"><img src="assets/logo_fzj.png" alt="Forschungszentrum Jülich" height="48"></a>
+    </td>
+    <td align="center" valign="middle">
+      <a href="https://www.dkz2r.de"><img src="assets/logo_dkz.png" alt="DKZ.2R – Rhine-Ruhr Center for Scientific Data Literacy" height="40"></a>
+    </td>
+  </tr>
+</table>
 
 ---
 
