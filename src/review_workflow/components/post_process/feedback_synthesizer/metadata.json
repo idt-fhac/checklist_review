@@ -1,0 +1,29 @@
+{
+  "id": "feedback_synthesizer",
+  "name": "Feedback Synthesizer",
+  "type": "post_process",
+  "description": "Produces narrative feedback from per-criterion evaluations.",
+  "inputs": [
+    {"name": "collection_name", "type": "string"},
+    {"name": "artifact_name", "type": "string"},
+    {"name": "pipeline_name", "type": "string"},
+    {"name": "criteria_set_name", "type": "string"}
+  ],
+  "outputs": [
+    {"name": "synthesis_file", "type": "string"},
+    {"name": "summary", "type": "string"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "provider_id": {"type": "string", "label": "LLM Provider"},
+      "persona": {
+        "type": "string",
+        "default": "editor",
+        "label": "Persona"
+      },
+      "system_prompt": {"type": "string", "label": "System prompt"}
+    },
+    "required": ["provider_id"]
+  }
+}

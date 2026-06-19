@@ -1,0 +1,28 @@
+{
+  "id": "section_mapper",
+  "name": "Section Mapper",
+  "type": "pre_process",
+  "description": "Maps each criterion to relevant artifact headings and excerpts.",
+  "inputs": [
+    {"name": "collection_name", "type": "string"},
+    {"name": "artifact_name", "type": "string"},
+    {"name": "pipeline_name", "type": "string"},
+    {"name": "criteria_set_name", "type": "string"},
+    {"name": "criteria", "type": "array"}
+  ],
+  "outputs": [
+    {"name": "mapping_file", "type": "string"},
+    {"name": "mapping", "type": "object"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "strategy": {
+        "type": "string",
+        "enum": ["heading_match"],
+        "default": "heading_match",
+        "label": "Mapping strategy"
+      }
+    }
+  }
+}

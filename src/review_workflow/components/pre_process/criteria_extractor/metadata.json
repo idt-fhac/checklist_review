@@ -1,0 +1,45 @@
+{
+  "id": "criteria_extractor",
+  "name": "Criteria Extractor",
+  "type": "pre_process",
+  "description": "Extracts criteria from an RFP, rubric, or artifact source document.",
+  "inputs": [
+    {"name": "collection_name", "type": "string"},
+    {"name": "artifact_name", "type": "string"},
+    {"name": "pipeline_name", "type": "string"},
+    {"name": "criteria_set_name", "type": "string"},
+    {"name": "criteria_source_name", "type": "string"}
+  ],
+  "outputs": [
+    {"name": "criteria_file", "type": "string"},
+    {"name": "criteria_count", "type": "number"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "enum": ["rfp", "artifact", "criteria_set"],
+        "default": "artifact",
+        "label": "Source"
+      },
+      "source_filename": {
+        "type": "string",
+        "label": "Source filename (optional)"
+      },
+      "output": {
+        "type": "string",
+        "default": "criteria.yaml",
+        "label": "Output filename"
+      },
+      "provider_id": {"type": "string", "label": "LLM Provider"},
+      "scoring": {
+        "type": "string",
+        "default": "pass_fail",
+        "label": "Default scoring type"
+      },
+      "system_prompt": {"type": "string", "label": "Extraction system prompt"}
+    },
+    "required": ["provider_id"]
+  }
+}

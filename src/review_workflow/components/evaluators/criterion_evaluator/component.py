@@ -48,18 +48,38 @@ class CriterionEvaluator(BaseComponent):
             return self._execute_batch(
                 collection_name, pipeline_name, artifact_name, criteria_set_name,
                 criteria, log_callback, token_usage_accumulator, collections_root,
+                inputs.get("section_mapping"),
             )
         if not criterion:
             return self._log_error("'criterion' or 'criteria' is required", log_callback)
         return self._execute_single(
             collection_name, pipeline_name, artifact_name, criteria_set_name,
             criterion, log_callback, token_usage_accumulator, collections_root,
+            inputs.get("section_mapping"),
         )
     
+    def _apply_section_mapping(
+        self,
+        md_content: str,
+        artifact_pages: List[Dict[str, Any]],
+        criterion_id: Any,
+        section_mapping: Optional[Dict[str, Any]],
+    ):
+        if not section_mapping or criterion_id is None:
+            return md_content, artifact_pages
+        mapped = section_mapping.get(str(criterion_id)) or section_mapping.get(criterion_id)
+        if not mapped:
+            return md_content, artifact_pages
+        excerpt = mapped.get("excerpt")
+        if excerpt:
+            return clean_text_for_encoding(excerpt), []
+        return md_content, artifact_pages
+
     def _execute_single(self, collection_name: str, pipeline_name: str, artifact_name: str,
                         criteria_set_name: str, criterion: Dict[str, Any], log_callback,
                         token_usage_accumulator: Optional[Dict[str, Any]] = None,
-                        collections_root: Optional[Path] = None) -> Dict[str, Any]:
+                        collections_root: Optional[Path] = None,
+                        section_mapping: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
         existing = load_existing_evaluations(evaluations_file)
 
@@ -89,6 +109,9 @@ class CriterionEvaluator(BaseComponent):
         md_content = clean_text_for_encoding(md_content)
         artifact_pages = extract_pages_from_markdown(md_content)
         criterion_text = clean_text_for_encoding(criterion.get('description', ''))
+        md_content, artifact_pages = self._apply_section_mapping(
+            md_content, artifact_pages, criterion_id, section_mapping
+        )
         
         context_content, context_pages = prepare_rag_context(
             md_content, artifact_pages, criterion_text, collection_name, 
@@ -123,7 +146,8 @@ class CriterionEvaluator(BaseComponent):
     def _execute_batch(self, collection_name: str, pipeline_name: str, artifact_name: str,
                        criteria_set_name: str, criteria: List[Dict[str, Any]], log_callback,
                        token_usage_accumulator: Optional[Dict[str, Any]] = None,
-                       collections_root: Optional[Path] = None) -> Dict[str, Any]:
+                       collections_root: Optional[Path] = None,
+                       section_mapping: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
         existing_evaluations = load_existing_evaluations(evaluations_file)
         

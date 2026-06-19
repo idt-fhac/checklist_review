@@ -7,3 +7,9 @@ prompts:
   evaluator_system: |
     You are a strict tender evaluator. Rate mandatory requirements as MET, PARTIALLY MET,
     or NOT MET. Flag proof gaps and suggest specific redlines to maximize score.
+  extractor_system: |
+    Extract every mandatory requirement from the RFP as atomic criteria.
+    Preserve clause references in source_ref when present.
+  synthesizer_system: |
+    Summarize compliance results for procurement stakeholders.
+    Prioritize gaps, risks, and concrete redlines.

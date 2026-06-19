@@ -37,7 +37,10 @@ COMPONENT_PHASE: Dict[str, str] = {
 
 IMPLEMENTED_STAGES = {
     "document_loader",
+    "criteria_extractor",
+    "section_mapper",
     "criterion_evaluator",
+    "feedback_synthesizer",
     "report_writer",
     "md_writer",
     "pdf_writer",
@@ -78,9 +81,14 @@ def _resolve_provider_fields(config: Dict[str, Any]) -> Dict[str, Any]:
     if embedding_ref:
         resolved["rag_embedding_provider_id"] = embedding_ref
     profile = resolved.pop("_profile_prompts", None)
+    stage = resolved.pop("_stage", None)
     if profile and not resolved.get("system_prompt"):
         prompts = profile.get("prompts") or {}
-        if prompts.get("evaluator_system"):
+        if stage == "criteria_extractor" and prompts.get("extractor_system"):
+            resolved["system_prompt"] = prompts["extractor_system"]
+        elif stage == "feedback_synthesizer" and prompts.get("synthesizer_system"):
+            resolved["system_prompt"] = prompts["synthesizer_system"]
+        elif prompts.get("evaluator_system"):
             resolved["system_prompt"] = prompts["evaluator_system"]
     return resolved
 
@@ -96,7 +104,9 @@ def pipeline_to_steps(pipeline: Dict[str, Any]) -> List[Dict[str, Any]]:
         component_id = STAGE_TO_COMPONENT.get(stage_name, stage_name)
         if stage_name == "report_writer":
             component_id = stage_config.get("component") or "pdf_writer"
-        config = _resolve_provider_fields({**stage_config, "_profile_prompts": profile})
+        config = _resolve_provider_fields(
+            {**stage_config, "_profile_prompts": profile, "_stage": stage_name}
+        )
         steps.append(
             {
                 "id": f"step_{index + 1}",
@@ -165,7 +175,10 @@ def build_review_process_definition(
         "pipeline_id": pipeline.get("id") or pipeline_id,
         "profile": pipeline.get("profile"),
         "document_loader": {},
+        "criteria_extractor": {},
+        "section_mapper": {},
         "criterion_evaluator": {},
+        "feedback_synthesizer": {},
         "post_processors": [],
     }
 
@@ -184,11 +197,17 @@ def build_review_process_definition(
 
         if comp_id == "document_loader":
             review_process_def["document_loader"] = {"config": config}
+        elif comp_id == "criteria_extractor":
+            review_process_def["criteria_extractor"] = {"config": config}
+        elif comp_id == "section_mapper":
+            review_process_def["section_mapper"] = {"config": config}
         elif comp_id == "criterion_evaluator":
             config.setdefault("tools", [])
             for tool_cfg in tools_map.values():
                 config["tools"].append(tool_cfg)
             review_process_def["criterion_evaluator"] = {"config": config}
+        elif comp_id == "feedback_synthesizer":
+            review_process_def["feedback_synthesizer"] = {"config": config}
         elif comp_id in ("md_writer", "pdf_writer", "json_writer"):
             review_process_def["post_processors"].append({"id": comp_id, "config": config})
 

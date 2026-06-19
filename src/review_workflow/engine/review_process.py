@@ -1,11 +1,14 @@
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from src.core.criteria import criteria_for_evaluator, criteria_set_stem, find_criteria_set_path, load_criteria_set_file
 from src.review_workflow.components.pre_process.document_loader.component import DocumentLoader
+from src.review_workflow.components.pre_process.criteria_extractor.component import CriteriaExtractor
+from src.review_workflow.components.pre_process.section_mapper.component import SectionMapper
 from src.review_workflow.components.evaluators.criterion_evaluator.component import CriterionEvaluator
+from src.review_workflow.components.post_process.feedback_synthesizer.component import FeedbackSynthesizer
 from src.review_workflow.components.post_process.md_writer.component import MdWriter
 from src.review_workflow.components.post_process.pdf_writer.component import PdfWriter
 from src.review_workflow.components.post_process.json_writer.component import JsonWriter
@@ -30,7 +33,10 @@ class ReviewProcess:
             self.collections_root = Path(collections_root)
 
         self.document_loader = self._init_component(process_definition.get("document_loader", {}), DocumentLoader)
+        self.criteria_extractor = self._init_optional(process_definition.get("criteria_extractor", {}), CriteriaExtractor)
+        self.section_mapper = self._init_optional(process_definition.get("section_mapper", {}), SectionMapper)
         self.criterion_evaluator = self._init_component(process_definition.get("criterion_evaluator", {}), CriterionEvaluator)
+        self.feedback_synthesizer = self._init_optional(process_definition.get("feedback_synthesizer", {}), FeedbackSynthesizer)
 
         self.post_processors: List[BaseComponent] = []
         for pp_def in process_definition.get("post_processors", []):
@@ -42,6 +48,11 @@ class ReviewProcess:
                 self.post_processors.append(self._init_component(pp_def, JsonWriter))
 
     def _init_component(self, def_dict: Dict[str, Any], cls: Any) -> BaseComponent:
+        return cls(config=def_dict.get("config", {}))
+
+    def _init_optional(self, def_dict: Dict[str, Any], cls: Any) -> Optional[BaseComponent]:
+        if not def_dict or not def_dict.get("config"):
+            return None
         return cls(config=def_dict.get("config", {}))
 
     def _slug(self, name: str) -> str:
@@ -67,6 +78,16 @@ class ReviewProcess:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "token_usage.json").write_text(json.dumps(token_usage, indent=2), encoding="utf-8")
 
+    def _load_criteria_set(
+        self,
+        criteria_dir: Path,
+        criteria_set_name: str,
+    ):
+        criteria_path = find_criteria_set_path(criteria_dir, criteria_set_name)
+        if criteria_path is None:
+            return None
+        return load_criteria_set_file(criteria_path)
+
     def execute(
         self,
         collection_name: str,
@@ -74,6 +95,7 @@ class ReviewProcess:
         criteria_set_name: str,
         artifact_index: int | None = None,
         total_artifacts: int | None = None,
+        criteria_source_name: str | None = None,
     ):
         if self.stop_event and self.stop_event.is_set():
             raise InterruptedError("Review process stopped by user")
@@ -99,17 +121,20 @@ class ReviewProcess:
                 self.log_callback(f"{'='*15}\n\n{artifact_title}", "info")
 
         criteria_dir = self.collections_root.parent / "criteria_sets"
-        criteria_path = find_criteria_set_path(criteria_dir, criteria_set_name)
-        if criteria_path is None:
-            raise FileNotFoundError(f"Criteria set '{criteria_set_name}' not found in {criteria_dir}")
+        extractor_source = (
+            (self.criteria_extractor.config.get("source") or "artifact").lower()
+            if self.criteria_extractor
+            else None
+        )
+        use_extractor = self.criteria_extractor and extractor_source != "criteria_set"
 
-        criteria_set = load_criteria_set_file(criteria_path)
-        criteria = criteria_for_evaluator(criteria_set)
-        if not criteria:
-            raise ValueError(f"No criteria in criteria set '{criteria_set_name}'")
-
-        if self.log_callback:
-            self.log_callback("Criteria set loaded", "info")
+        criteria_set = None
+        if not use_extractor:
+            criteria_set = self._load_criteria_set(criteria_dir, criteria_set_name)
+            if criteria_set is None:
+                raise FileNotFoundError(f"Criteria set '{criteria_set_name}' not found in {criteria_dir}")
+            if self.log_callback:
+                self.log_callback("Criteria set loaded", "info")
 
         artifact_result = self.document_loader.execute({
             "collection_name": collection_name,
@@ -126,6 +151,32 @@ class ReviewProcess:
         if self.log_callback:
             self.log_callback("Artifact loaded", "info")
 
+        if use_extractor:
+            extract_result = self.criteria_extractor.execute({
+                "collection_name": collection_name,
+                "artifact_name": artifact_name,
+                "pipeline_name": self.pipeline_name,
+                "criteria_set_name": criteria_set_name,
+                "collections_root": self.collections_root,
+                "criteria_source_name": criteria_source_name,
+                "log_callback": self.log_callback,
+            })
+            if extract_result.get("status") == "completed":
+                criteria_set = load_criteria_set_file(Path(extract_result["criteria_file"]))
+                if self.log_callback:
+                    self.log_callback(
+                        f"Using {extract_result.get('criteria_count', 0)} extracted criteria",
+                        "info",
+                    )
+            elif criteria_set is None:
+                criteria_set = self._load_criteria_set(criteria_dir, criteria_set_name)
+            if criteria_set is None:
+                raise FileNotFoundError("No criteria available after extraction")
+
+        criteria = criteria_for_evaluator(criteria_set)
+        if not criteria:
+            raise ValueError(f"No criteria available for '{criteria_set_name}'")
+
         token_usage_accumulator = create_accumulator()
         run_context = {
             "collection_name": collection_name,
@@ -135,7 +186,15 @@ class ReviewProcess:
             "collections_root": self.collections_root,
             "log_callback": self.log_callback,
             "token_usage_accumulator": token_usage_accumulator,
+            "section_mapping": None,
         }
+
+        if self.section_mapper:
+            mapping_result = self.section_mapper.execute({
+                **run_context,
+                "criteria": criteria,
+            })
+            run_context["section_mapping"] = mapping_result.get("mapping")
 
         if self.criterion_evaluator.config.get("answer_all_together", False):
             self.criterion_evaluator.execute({**run_context, "criteria": criteria})
@@ -146,6 +205,12 @@ class ReviewProcess:
                 if self.log_callback:
                     self.log_callback(f"Evaluating criterion {idx}/{len(criteria)}", "info")
                 self.criterion_evaluator.execute({**run_context, "criterion": criterion})
+
+        if self.feedback_synthesizer:
+            self.feedback_synthesizer.execute({
+                **run_context,
+                "token_usage_accumulator": token_usage_accumulator,
+            })
 
         token_usage = get_summary(token_usage_accumulator)
         self._write_token_usage_file(collection_name, artifact_name, criteria_set_name, token_usage)
