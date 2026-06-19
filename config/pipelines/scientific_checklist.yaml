@@ -1,0 +1,15 @@
+name: scientific_checklist
+profile: scientific
+stages:
+  - document_loader:
+      extraction_method: Extracted Content
+      force_execution: false
+  - criterion_evaluator:
+      provider: primary_llm
+      system_prompt: |
+        You are a rigorous scientific reviewer. Answer each criterion based on the artifact content.
+      force_review: true
+      use_rag: false
+  - report_writer:
+      component: pdf_writer
+      save_details: true

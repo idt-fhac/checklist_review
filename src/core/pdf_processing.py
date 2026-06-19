@@ -21,7 +21,8 @@ except ImportError:
     pymupdf4llm = None
 
 from src.review_workflow.engine.utils import load_model_from_provider
-from src.web.settings.services import SettingsManager
+from src.core.config_loader import get_pdf_metadata_method
+from src.core.providers import get_provider, get_provider_for_purpose, load_all_providers
 from strands import Agent
 from pydantic import BaseModel, Field
 
@@ -252,11 +253,7 @@ def extract_first_page(md_content: str) -> str:
 
 def get_pdf_metadata_extraction_method() -> str:
     """Return the configured PDF metadata extraction method."""
-    settings = SettingsManager.load_settings()
-    method = settings.get(
-        "pdf_metadata_extraction_method",
-        PDF_METADATA_EXTRACTION_METHOD_LLM,
-    )
+    method = get_pdf_metadata_method()
     if method == PDF_METADATA_EXTRACTION_METHOD_RULE_BASED:
         return PDF_METADATA_EXTRACTION_METHOD_RULE_BASED
     return PDF_METADATA_EXTRACTION_METHOD_LLM
@@ -646,78 +643,29 @@ def extract_metadata_from_first_page(
 
 
 def get_default_llm_provider() -> Optional[Dict[str, Any]]:
-    """
-    Get the LLM provider for PDF processing from settings.
-    Returns the provider specified in settings, or the first provider if not specified, or None if no providers are configured.
-    """
-    settings = SettingsManager.load_settings()
-    secrets = SettingsManager.load_secrets()
-
-    if not secrets:
+    """Get the LLM provider for PDF processing from config/providers.yaml."""
+    provider = get_provider_for_purpose("pdf_metadata")
+    if not provider:
+        providers = load_all_providers()
+        provider = next((p for p in providers if not p.get("is_embedding_model")), None)
+    if not provider:
         return None
-
-    # Check if a specific provider is configured in settings
-    provider_id = settings.get("pdf_processing_llm_provider_id")
-    if provider_id:
-        provider = next((p for p in secrets if p.get("id") == provider_id), None)
-        if provider:
-            # Validate provider has required fields
-            if provider.get("type") in ["openai", "litellm"]:
-                if not provider.get("model_name"):
-                    # Fall back to first provider
-                    pass
-                else:
-                    return provider
-            else:
-                return provider
-
-    # Fall back to first provider
-    provider = secrets[0]
-
-    # Ensure it has required fields
-    if provider.get("type") in ["openai", "litellm"]:
-        if not provider.get("model_name"):
-            return None
-
-    return provider
+    if provider.get("type") in ["openai", "litellm"] and not provider.get("model_name"):
+        return None
+    return dict(provider)
 
 
 def get_checklist_extraction_llm_provider() -> Optional[Dict[str, Any]]:
-    """
-    Get the LLM provider for checklist extraction from settings.
-    Returns the provider specified in settings, or the first provider if not specified, or None if no providers are configured.
-    """
-    settings = SettingsManager.load_settings()
-    secrets = SettingsManager.load_secrets()
-
-    if not secrets:
+    """Get the LLM provider for criteria extraction from config/providers.yaml."""
+    provider = get_provider_for_purpose("criteria_extraction")
+    if not provider:
+        providers = load_all_providers()
+        provider = next((p for p in providers if not p.get("is_embedding_model")), None)
+    if not provider:
         return None
-
-    # Check if a specific provider is configured in settings
-    provider_id = settings.get("checklist_extraction_llm_provider_id")
-    if provider_id:
-        provider = next((p for p in secrets if p.get("id") == provider_id), None)
-        if provider:
-            # Validate provider has required fields
-            if provider.get("type") in ["openai", "litellm"]:
-                if not provider.get("model_name"):
-                    # Fall back to first provider
-                    pass
-                else:
-                    return provider
-            else:
-                return provider
-
-    # Fall back to first provider
-    if secrets:
-        provider = secrets[0]
-        # Ensure it has required fields
-        if provider.get("type") in ["openai", "litellm"]:
-            if not provider.get("model_name"):
-                return None
-        return provider
-
-    return None
+    if provider.get("type") in ["openai", "litellm"] and not provider.get("model_name"):
+        return None
+    return dict(provider)
 
 
 class ChecklistQuestion(BaseModel):

@@ -741,95 +741,57 @@ def _generated_dir(collection_dir: Path) -> Path:
     return path
 
 
-# Global process definitions
+# Global process definitions (config/pipelines)
 def _global_processes_dir(base_dir: Path) -> Path:
-    from src.core.workspace import get_process_definitions_dir
-    return get_process_definitions_dir()
+    from src.core.config_loader import get_repo_config_dir
+    return get_repo_config_dir() / "pipelines"
 
 
 def list_global_processes(base_dir: Path) -> List[Dict[str, Any]]:
-    """List all globally available process definitions"""
-    proc_dir = _global_processes_dir(base_dir)
+    """List all pipelines declared in config/pipelines/."""
+    from src.core.config_loader import list_pipelines
+
     results = []
-    
-    # Default process should exist in process_definitions directory
-    # If it doesn't exist, it will need to be created manually
-    
-    for file in sorted(proc_dir.glob("*.json")):
-        content_name = None
-        try:
-            with open(file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                content_name = data.get("name")
-        except Exception:
-            pass
-
-        display_name = content_name if content_name else file.stem
-        slug_name = file.stem
-
-        results.append({
-            "name": display_name,
-            "slug": slug_name,
-            "filename": file.name,
-            "path": str(file),
-            "updated_at": datetime.fromtimestamp(file.stat().st_mtime),
-            "data": { "name": content_name } if content_name else {}
-        })
+    for item in list_pipelines():
+        pipeline_id = item["id"]
+        results.append(
+            {
+                "name": item.get("name", pipeline_id),
+                "slug": pipeline_id,
+                "filename": f"{pipeline_id}.yaml",
+                "path": item.get("path"),
+                "updated_at": datetime.fromtimestamp(Path(item["path"]).stat().st_mtime)
+                if item.get("path") and Path(item["path"]).exists()
+                else datetime.utcnow(),
+                "data": {"name": item.get("name"), "profile": item.get("profile")},
+            }
+        )
     return results
 
 
 def load_global_process(base_dir: Path, process_name: str) -> Dict[str, Any] | None:
-    """Load a globally available process definition"""
-    proc_dir = _global_processes_dir(base_dir)
-    path = proc_dir / f"{process_name}.json"
-    if not path.exists():
-        path = proc_dir / f"{_slug(process_name)}.json"
-    
-    # If still not found and it's the default process, check process_definitions one more time
-    if not path.exists() and (process_name == "default_review" or _slug(process_name) == "default_review"):
-        process_def_path = proc_dir / "default_review.json"
-        if process_def_path.exists():
-            path = process_def_path
-    
-    if not path.exists():
-        return None
-        
+    """Load a pipeline from config/pipelines/ as a read-only flow graph."""
+    from src.review_workflow.engine.pipeline_loader import load_pipeline_flow
+
     try:
-        with path.open(encoding="utf-8") as fp:
-            return json.load(fp)
-    except:
-        return None
+        return load_pipeline_flow(process_name)
+    except FileNotFoundError:
+        slug = _slug(process_name)
+        try:
+            return load_pipeline_flow(slug)
+        except FileNotFoundError:
+            return None
 
 
 def save_global_process(base_dir: Path, process_name: str, data: Dict[str, Any]) -> Path:
-    """Save a process definition globally"""
-    proc_dir = _global_processes_dir(base_dir)
-    slug_name = _slug(process_name)
-    path = proc_dir / f"{slug_name}.json"
-    if "name" not in data or data.get("name") != process_name:
-        data["name"] = process_name
-    
-    with path.open("w", encoding="utf-8") as fp:
-        json.dump(data, fp, indent=2)
-    return path
+    """Pipelines are config-managed; UI mutation is not supported."""
+    raise PermissionError(
+        "Pipelines are defined in config/pipelines/*.yaml and cannot be saved from the UI."
+    )
 
 
 def delete_global_process(base_dir: Path, process_name: str) -> bool:
-    """Delete a globally available process definition"""
-    if process_name == "default_review":
-        return False
-    proc_dir = _global_processes_dir(base_dir)
-    slug_name = _slug(process_name)
-    process_file = proc_dir / f"{slug_name}.json"
-    if not process_file.exists():
-        process_file = proc_dir / f"{process_name}.json"
-    
-    if process_file.exists():
-        try:
-            process_file.unlink()
-            return True
-        except Exception:
-            pass
+    """Pipelines are config-managed; UI deletion is not supported."""
     return False
 
 

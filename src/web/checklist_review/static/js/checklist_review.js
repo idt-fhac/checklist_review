@@ -1558,7 +1558,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         await loadSpecificProcess(selectedProcess.slug);
                     } else if (processList && processList.children.length > 0) {
                         // If no process is selected but processes are available, load the first/default one
-                        const defaultItem = processList.querySelector('[data-process-slug="default_review"]');
+                        const defaultItem = processList.querySelector('[data-process-slug="scientific_checklist"]');
                         const firstItem = processList.querySelector('.list-group-item');
                         const processToLoad = defaultItem ? defaultItem.dataset.processSlug : (firstItem ? firstItem.dataset.processSlug : null);
                         if (processToLoad) {
@@ -1678,7 +1678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 // Fetch process data
-                const res = await fetch(`/review_process_design/api/processes/${processName}`);
+                const res = await fetch(`/checklist_review/api/processes/${processName}`);
                 if (!res.ok) {
                     throw new Error('Failed to load process');
                 }
@@ -1723,8 +1723,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Fetch providers and components for node rendering
                 const [componentsRes, providersRes] = await Promise.all([
-                    fetch('/review_process_design/api/components'),
-                    fetch('/review_process_design/api/providers')
+                    fetch('/checklist_review/api/components'),
+                    fetch('/checklist_review/api/providers')
                 ]);
                 const components = await componentsRes.json();
                 const providers = await providersRes.json();
@@ -2389,11 +2389,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const displayName = p.name || (p.data && p.data.name) || p.slug || 'Unknown';
                 const slugValue = p.slug || p.name;
                 
-                // Skip default_review process - it's only for design template purposes
-                if (slugValue === 'default_review' || displayName === 'Default Review Process') {
-                    return;
-                }
-                
                 const listItem = document.createElement('div');
                 listItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
                 listItem.dataset.processName = displayName;
@@ -2537,7 +2532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         try {
             // Fetch process data
-            const res = await fetch(`/review_process_design/api/processes/${processSlug}`);
+            const res = await fetch(`/checklist_review/api/processes/${processSlug}`);
             if (!res.ok) {
                 throw new Error('Failed to load process');
             }
@@ -2584,8 +2579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Fetch providers and components for node rendering
             const [componentsRes, providersRes] = await Promise.all([
-                fetch('/review_process_design/api/components'),
-                fetch('/review_process_design/api/providers')
+                fetch('/checklist_review/api/components'),
+                fetch('/checklist_review/api/providers')
             ]);
             const components = await componentsRes.json();
             const providers = await providersRes.json();
@@ -2837,7 +2832,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateButtonStates() {
         const selectedProcess = getSelectedProcess();
         const currentProcess = selectedProcess ? selectedProcess.slug : null;
-        const isDefault = currentProcess === 'default_review';
+        const isDefault = true; // Pipelines are config-managed (config/pipelines/*.yaml)
 
         // Disable Update if default process or no changes (only if button exists)
         if (updateProcessBtn) {
@@ -4700,7 +4695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentSelection = currentSelectedProcess ? currentSelectedProcess.slug : null; // Store current selection
 
         try {
-            const res = await fetch('/review_process_design/api/processes', {
+            const res = await fetch('/checklist_review/api/processes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name, data: data })
@@ -4747,7 +4742,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         const current = selectedProcess.slug;
-        if (current === 'default_review') {
+        if (current === 'scientific_checklist') {
             showSaveNotification('Cannot update the default process. Please create a new one.', true);
             return;
         }
@@ -4761,9 +4756,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (createProcessBtn) {
         createProcessBtn.addEventListener('click', async () => {
         const selectedProcess = getSelectedProcess();
-        const currentName = selectedProcess ? selectedProcess.slug : 'default_review';
+        const currentName = selectedProcess ? selectedProcess.slug : 'scientific_checklist';
         let defaultName;
-        if (currentName === 'default_review') {
+        if (currentName === 'scientific_checklist') {
             // Find the next available "My Review Process N" name
             const processItems = Array.from(processList.querySelectorAll('.list-group-item'));
             const existingNames = new Set(processItems.map(item => item.dataset.processName || item.dataset.processSlug));
@@ -4851,7 +4846,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             const current = selectedProcess.slug; // This is the slug
-            if (current === 'default_review') {
+            if (current === 'scientific_checklist') {
                 showSaveNotification('Cannot rename the default process', true);
                 return;
             }
@@ -4863,7 +4858,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!newName || newName === currentDisplayName) return;
 
             try {
-                const res = await fetch(`/review_process_design/api/processes/${encodeURIComponent(current)}/rename`, {
+                const res = await fetch(`/checklist_review/api/processes/${encodeURIComponent(current)}/rename`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4906,7 +4901,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         const current = selectedProcess.slug;
-        if (current === 'default_review') {
+        if (current === 'scientific_checklist') {
             showSaveNotification('Cannot delete the default process', true);
             return;
         }
@@ -4936,7 +4931,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 // Reload processes and select default if available
                 await loadProcesses(false);
-                const defaultItem = processList.querySelector('[data-process-slug="default_review"]');
+                const defaultItem = processList.querySelector('[data-process-slug="scientific_checklist"]');
                 const firstItem = processList.querySelector('.list-group-item');
                 if (defaultItem) {
                     defaultItem.classList.add('active');
@@ -4944,7 +4939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         name: defaultItem.dataset.processName,
                         slug: defaultItem.dataset.processSlug
                     };
-                    await loadSpecificProcess('default_review');
+                    await loadSpecificProcess('scientific_checklist');
                 } else if (firstItem) {
                     firstItem.classList.add('active');
                     currentSelectedProcess = {

@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 from src.review_workflow.engine.base import BaseComponent
-from src.web.settings.services import SettingsManager
+from src.core.providers import get_provider, resolve_provider_config
 
 from src.review_workflow.components.evaluators.question_reviewer.models import ReviewResponse, BatchReviewResponse
 from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
@@ -380,11 +380,10 @@ class QuestionReviewer(BaseComponent):
                     return self._ensure_batch_one_per_question([], questions, log_callback, default_error=error_detail)
 
     def _get_provider_config(self, provider_id):
-        secrets = SettingsManager.load_secrets()
-        config = next((p for p in secrets if p["id"] == provider_id), None)
-        if not config:
-            raise ValueError(f"Provider {provider_id} not found")
-        return config
+        try:
+            return resolve_provider_config(provider_id)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@ from typing import Any, Dict
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 
-from src.web.settings.services import LLMProvider, SettingsManager
+from src.core.types import LLMProvider
+from src.web.settings.services import SettingsManager
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/settings", template_folder="templates")
 
@@ -67,13 +68,18 @@ def index():
             try:
                 _handle_add_provider(request.form)
                 flash("Provider added successfully.", "success")
+            except PermissionError as e:
+                flash(str(e), "warning")
             except ValueError as e:
                 flash(str(e), "danger")
         
         elif form_type == "delete_provider":
             provider_id = request.form.get("provider_id")
-            _handle_delete_provider(provider_id)
-            flash("Provider removed.", "success")
+            try:
+                _handle_delete_provider(provider_id)
+                flash("Provider removed.", "success")
+            except PermissionError as e:
+                flash(str(e), "warning")
             
         elif form_type == "duplicate_provider":
             provider_id = request.form.get("provider_id")

@@ -1,0 +1,11 @@
+name: education
+description: Student work reviewed against an uploaded rubric
+scoring:
+  default_type: scale
+  scale_min: 1
+  scale_max: 10
+feedback_mode: both
+prompts:
+  evaluator_system: |
+    You are a constructive educator. Score each rubric criterion and give actionable
+    advice the student can use to improve their work.

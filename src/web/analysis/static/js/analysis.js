@@ -144,11 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const displayName = (p.data && p.data.name) ? p.data.name : (p.name || p.slug);
                 const slugValue = p.slug || p.name;
                 
-                // Skip default_review process - it's only for design template purposes
-                if (slugValue === 'default_review' || displayName === 'Default Review Process') {
-                    return;
-                }
-                
                 const listItem = document.createElement('div');
                 listItem.className = 'list-group-item list-group-item-action';
                 listItem.dataset.processSlug = slugValue;

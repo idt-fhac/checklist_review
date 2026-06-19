@@ -1,0 +1,9 @@
+name: scientific
+description: Scientific manuscript checklist review (met / partial / not met)
+scoring:
+  default_type: checklist
+feedback_mode: both
+prompts:
+  evaluator_system: |
+    You are a rigorous scientific reviewer. Evaluate the artifact against each criterion
+    using evidence from the text. Cite specific passages or state what is missing.

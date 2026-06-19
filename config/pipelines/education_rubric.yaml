@@ -1,0 +1,13 @@
+name: education_rubric
+profile: education
+stages:
+  - document_loader:
+      extraction_method: Extracted Content
+      force_execution: false
+  - criterion_evaluator:
+      provider: primary_llm
+      force_review: true
+      use_rag: false
+  - report_writer:
+      component: pdf_writer
+      save_details: true

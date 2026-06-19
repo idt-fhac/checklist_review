@@ -11,7 +11,7 @@ from typing import List, Optional
 from src.review_workflow.engine.base import BaseComponent
 from src.review_workflow.engine.utils import load_model_from_provider
 from src.review_workflow.engine.token_usage import add as token_usage_add
-from src.web.settings.services import SettingsManager
+from src.core.providers import resolve_provider_config
 from strands import Agent, tool
 
 
@@ -121,11 +121,7 @@ class FigureReviewer(BaseComponent):
         collections_root: Optional[Path] = None,
     ) -> str:
         def get_provider_config(provider_id: str):
-            secrets = SettingsManager.load_secrets()
-            config = next((p for p in secrets if p["id"] == provider_id), None)
-            if not config:
-                raise ValueError(f"Provider {provider_id} not found")
-            return config
+            return resolve_provider_config(provider_id)
 
         def create_agent() -> Agent:
             provider_id = self.config.get("provider_id")

@@ -16,19 +16,11 @@ class VisualizationError(RuntimeError):
 
 
 def list_available_models() -> List[str]:
-    from src.web.settings.services import SettingsManager
-    secrets = SettingsManager.load_secrets()
-    ollama_providers = [p for p in secrets if p["type"] == "ollama"]
+    from src.core.providers import get_ollama_models, load_all_providers
+
+    ollama_providers = [p for p in load_all_providers() if p["type"] == "ollama"]
     base_url = ollama_providers[0]["base_url"] if ollama_providers else "http://localhost:11434"
-    try:
-        response = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            items = data.get("models") or []
-            return [item.get("name") for item in items if item.get("name")]
-    except Exception:
-        pass
-    return []
+    return get_ollama_models(base_url)
 
 
 def embed_texts(texts: Sequence[str], model: str | None = None) -> np.ndarray:
@@ -135,10 +127,11 @@ def visualize_collection(collection_payload: Dict[str, Any], model: str | None =
     if not any(abstracts):
         raise VisualizationError("No abstracts available to visualize.")
 
-    from src.web.settings.services import SettingsManager
-    settings = SettingsManager.load_settings()
-    method = settings.get("embedding_model_type", "ollama")
-    target_model = model or settings.get("embedding_ollama_model")
+    from src.core.providers import get_provider_for_purpose
+
+    default_embedding = get_provider_for_purpose("embedding")
+    target_model = model or (default_embedding.get("model_name") if default_embedding else None)
+    method = "provider" if default_embedding else "tfidf"
 
     embeddings = embed_texts(abstracts, model=target_model)
     coords = reduce_embeddings(embeddings)

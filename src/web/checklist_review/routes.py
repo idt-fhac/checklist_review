@@ -19,9 +19,55 @@ from src.core import task_persistence
 from src.review_workflow.engine.components import list_components_metadata, get_component_metadata
 from src.review_workflow.engine.review_process import ReviewProcess
 from src.review_workflow.engine.tool_loader import discover_review_tools
+from src.review_workflow.engine.pipeline_loader import build_review_process_definition
 
 checklist_review_bp = Blueprint("checklist_review", __name__, url_prefix="/checklist_review", template_folder="templates")
 logger = logging.getLogger(__name__)
+
+
+def _resolve_review_process_definition(
+    pipeline_id: str | None,
+    process_data: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Load a ReviewProcess definition from config pipeline id."""
+    if pipeline_id:
+        return build_review_process_definition(pipeline_id)
+    if process_data and (process_data.get("nodes") or process_data.get("stages")):
+        steps = _convert_flow_to_steps(process_data)
+        legacy_name = process_data.get("name") or "legacy_process"
+        review_process_def = {
+            "name": legacy_name,
+            "config": {"separate_criteria": True},
+            "artifact_loader": {},
+            "paper_loader": {},
+            "criterion_evaluator": {},
+            "question_reviewer": {},
+            "post_processors": [],
+        }
+        available_tools = discover_review_tools()
+        tool_ids = set(available_tools.keys())
+        tools_map = {}
+        for step in steps:
+            comp_id = step.get("component_id")
+            if comp_id in tool_ids:
+                tools_map[step["id"]] = {comp_id: step.get("config", {})}
+        for step in steps:
+            comp_id = step.get("component_id")
+            config = step.get("config", {})
+            if comp_id == "paper_loader":
+                review_process_def["artifact_loader"] = {"config": config}
+                review_process_def["paper_loader"] = {"config": config}
+            elif comp_id == "question_reviewer":
+                if "tools" not in config:
+                    config["tools"] = []
+                for tool_cfg in tools_map.values():
+                    config["tools"].append(tool_cfg)
+                review_process_def["criterion_evaluator"] = {"config": config}
+                review_process_def["question_reviewer"] = {"config": config}
+            elif comp_id in ("md_writer", "pdf_writer", "json_writer"):
+                review_process_def["post_processors"].append({"id": comp_id, "config": config})
+        return review_process_def
+    raise ValueError("pipeline_id (process_name) is required; pipelines are defined in config/pipelines/")
 
 
 @checklist_review_bp.route("/static/<path:filename>")
@@ -418,14 +464,7 @@ def api_list_components():
 @checklist_review_bp.get("/api/providers")
 def api_list_providers():
     from src.web.settings.services import SettingsManager
-    providers = SettingsManager.load_secrets()
-    # Filter out embedding models - only show non-embedding models
-    provider_list = [
-        {"id": p["id"], "name": p["name"], "type": p["type"]} 
-        for p in providers 
-        if not p.get("is_embedding_model", False)
-    ]
-    return jsonify(provider_list)
+    return jsonify(SettingsManager.list_providers_for_api())
 
 
 @checklist_review_bp.post("/api/simulate-checklist")
@@ -941,9 +980,16 @@ def api_extract_checklist(checklist_name):
         return jsonify({"error": f"Failed to extract questions: {str(e)}"}), 500
 
 
+@checklist_review_bp.get("/api/pipelines")
+def api_list_pipelines():
+    """List pipelines from config/pipelines/."""
+    from src.core.config_loader import list_pipelines
+    return jsonify(list_pipelines())
+
+
 @checklist_review_bp.get("/api/processes")
 def api_list_processes():
-    """List all globally available process definitions"""
+    """List config-backed pipelines (legacy /api/processes alias)."""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     procs = storage.list_global_processes(base_dir)
     return jsonify(procs)
@@ -961,127 +1007,23 @@ def api_get_process(process_name):
 
 @checklist_review_bp.post("/api/processes")
 def api_save_process():
-    data = request.get_json()
-    process_name = data.get("name")
-    process_data = data.get("data")
-    
-    if not process_name:
-        return jsonify({"error": "Missing name"}), 400
-        
-    if process_name == "default_review":
-         return jsonify({"error": "Cannot overwrite default process. Please use Save As."}), 400
-        
-    # Process definitions are now global
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    storage.save_global_process(base_dir, process_name, process_data)
-    return jsonify({"success": True})
+    return jsonify({
+        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be modified from the UI."
+    }), 405
 
 
 @checklist_review_bp.delete("/api/processes/<process_name>")
 def api_delete_process(process_name):
-    if process_name == "default_review":
-        return jsonify({"error": "Cannot delete the default process"}), 400
-        
-    # Process definitions are now global
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    success = storage.delete_global_process(base_dir, process_name)
-    
-    if success:
-        # Delete process folders in all collections
-        collections_root = get_collections_dir()
-        folder_result = storage.delete_process_folders(collections_root, process_name)
-        
-        if folder_result["errors"]:
-            logger.warning(f"Some process folders could not be deleted: {folder_result['errors']}")
-        
-        message = f"Process '{process_name}' deleted successfully"
-        if folder_result["deleted"]:
-            message += f" ({len(folder_result['deleted'])} folder(s) deleted)"
-        if folder_result["errors"]:
-            message += f" ({len(folder_result['errors'])} error(s))"
-        
-        return jsonify({"success": True, "message": message, "folder_result": folder_result})
-    else:
-        return jsonify({"error": "Process not found or could not be deleted"}), 404
+    return jsonify({
+        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be deleted from the UI."
+    }), 405
 
 
 @checklist_review_bp.post("/api/processes/<process_name>/rename")
 def api_rename_process(process_name):
-    data = request.get_json()
-    new_name = data.get("new_name")
-    
-    if not new_name:
-        return jsonify({"error": "Missing new_name"}), 400
-    
-    if process_name == "default_review":
-        return jsonify({"error": "Cannot rename the default process"}), 400
-    
-    collections_root = get_collections_dir()
-    
-    # Helper function to convert to slug (matches storage._slug logic)
-    def to_slug(name: str) -> str:
-        if not name:
-            return "process"
-        return name.strip().replace(" ", "_").lower() or "process"
-    
-    # Process definitions are now global
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    
-    # Load the process - process_name from URL is the slug
-    process_data = storage.load_global_process(base_dir, process_name)
-    if not process_data:
-        return jsonify({"error": "Process not found"}), 404
-    
-    # Get the current process slug - process_name from URL is the slug
-    # Normalize it to ensure we have the correct slug
-    current_slug = to_slug(process_name)
-    
-    # Check if new name already exists (compare by slug to handle case/spaces differences)
-    existing_processes = storage.list_global_processes(base_dir)
-    new_name_slug = to_slug(new_name)
-    
-    # If new name slug is same as current, it's not a rename (just case/spacing change)
-    if new_name_slug == current_slug:
-        # Allow it - it's just updating the display name
-        pass
-    else:
-        # Check if another process with the new slug already exists
-        for proc in existing_processes:
-            # Get slug from process entry (prefer slug field, otherwise convert name)
-            proc_slug = proc.get("slug")
-            if not proc_slug:
-                proc_name = proc.get("name", "")
-                if not proc_name:
-                    continue
-                proc_slug = to_slug(proc_name)
-            
-            # If we find a process with the same slug that's not the current one, it's a duplicate
-            if proc_slug == new_name_slug and proc_slug != current_slug:
-                return jsonify({"error": "A process with this name already exists"}), 400
-    
-    try:
-        # Save with new name
-        storage.save_global_process(base_dir, new_name, process_data)
-        
-        # Rename process folders in all collections (before deleting old process)
-        folder_result = storage.rename_process_folders(collections_root, process_name, new_name)
-        
-        if folder_result["errors"]:
-            logger.warning(f"Some process folders could not be renamed: {folder_result['errors']}")
-        
-        # Delete old process
-        storage.delete_global_process(base_dir, process_name)
-        
-        message = f"Process renamed successfully"
-        if folder_result["renamed"]:
-            message += f" ({len(folder_result['renamed'])} folder(s) renamed)"
-        if folder_result["errors"]:
-            message += f" ({len(folder_result['errors'])} error(s))"
-        
-        return jsonify({"message": message, "new_name": new_name, "folder_result": folder_result})
-    except Exception as e:
-        logger.error(f"Error renaming process: {e}")
-        return jsonify({"error": f"Failed to rename process: {str(e)}"}), 500
+    return jsonify({
+        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be renamed from the UI."
+    }), 405
 
 
 
@@ -1136,20 +1078,20 @@ def api_run_process():
 
     if not collection_name:
         return jsonify({"error": "Missing collection_name"}), 400
+    if not process_name:
+        return jsonify({"error": "Missing pipeline id (process_name)"}), 400
         
     collections_root = get_collections_dir()
     selected_papers = storage.list_selected_files(collections_root, collection_name)
     
     if target_paper:
         selected_papers = [p for p in selected_papers if p.get("filename") == target_paper]
-    
-    steps = _convert_flow_to_steps(process_data)
-    execution_name = process_name if process_name else f"Executed Process {datetime.now().isoformat()}"
 
-    process_definition = {
-        "name": execution_name,
-        "steps": steps
-    }
+    try:
+        review_process_def = _resolve_review_process_definition(process_name, process_data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    execution_name = review_process_def.get("name") or process_name
     
     results = []
     
@@ -1160,73 +1102,17 @@ def api_run_process():
         paper_name = paper.get("filename")
         if not paper_name: continue
         
-        # Check if we should skip
         if process_name and storage.process_result_exists(collections_root, collection_name, process_name, paper_name, checklist_name):
-            # User wants to run on papers that have no answer yet.
             logger.info(f"Skipping {paper_name}, answer already exists for {process_name} with checklist {checklist_name}")
             continue
-
-        context = {
-            "collection_name": collection_name,
-            "paper_name": paper_name,
-            "collections_root": collections_root,
-        }
         
         try:
-            review_process_def = {
-                "name": execution_name,
-                "config": {"separate_questions": True},
-                "paper_loader": {}, 
-                "question_reviewer": {},
-                "post_processors": []
-            }
-            
-            # Dynamically discover available tools
-            available_tools = discover_review_tools()
-            tool_ids = set(available_tools.keys())
-            
-            tools_map = {}
-            for step in process_definition.get("steps", []):
-                 comp_id = step.get("component_id")
-                 if comp_id in tool_ids:
-                     tools_map[step["id"]] = { comp_id: step.get("config", {}) }
-
-            for step in process_definition.get("steps", []):
-                comp_id = step.get("component_id")
-                config = step.get("config", {})
-                
-                if comp_id == "paper_loader":
-                    review_process_def["paper_loader"]["config"] = config
-                elif comp_id == "question_reviewer":
-                    if "tools" not in config:
-                        config["tools"] = []
-                    
-                    for t in tools_map.values():
-                        config["tools"].append(t)
-                        
-                    review_process_def["question_reviewer"]["config"] = config
-                elif comp_id == "md_writer":
-                    review_process_def["post_processors"].append({
-                        "id": "md_writer",
-                        "config": config
-                    })
-                elif comp_id == "pdf_writer":
-                    review_process_def["post_processors"].append({
-                        "id": "pdf_writer",
-                        "config": config
-                    })
-                elif comp_id == "json_writer":
-                    review_process_def["post_processors"].append({
-                        "id": "json_writer",
-                        "config": config
-                    })
-
-            process_instance = ReviewProcess(review_process_def)
+            process_instance = ReviewProcess(review_process_def, collections_root=collections_root)
             
             run_result = process_instance.execute(
                 collection_name=collection_name,
-                paper_name=paper_name,
-                checklist_name=checklist_name
+                artifact_name=paper_name,
+                criteria_set_name=checklist_name,
             )
             result_summary = {
                 "paper_id": paper.get("paper_id", paper_name),
@@ -1479,6 +1365,8 @@ def api_start_review():
         
         if not collection_name:
             return jsonify({"error": "Please select a collection first."}), 400
+        if not process_name:
+            return jsonify({"error": "Please select a pipeline first."}), 400
         
         collections_root = get_collections_dir()
         collections_root_path = Path(collections_root)
@@ -1802,64 +1690,11 @@ def _run_review_process_background(task_id: str, collections_root):
             checklist_name = checklist_path.stem
         
         try:
-            steps = _convert_flow_to_steps(task.process_data)
+            review_process_def = _resolve_review_process_definition(task.process_name, task.process_data)
         except Exception as e:
-            logger.error(f"Error converting flow to steps: {e}", exc_info=True)
-            add_log_message(f"Error: Failed to convert process data: {str(e)}", "error")
+            logger.error(f"Error loading pipeline: {e}", exc_info=True)
+            add_log_message(f"Error: Failed to load pipeline: {str(e)}", "error")
             raise
-        
-        execution_name = task.process_name if task.process_name else f"Executed Process {datetime.now().isoformat()}"
-        
-        process_definition = {
-            "name": execution_name,
-            "steps": steps
-        }
-        
-        review_process_def = {
-            "name": execution_name,
-            "config": {"separate_questions": True},
-            "paper_loader": {},
-            "question_reviewer": {},
-            "post_processors": []
-        }
-        
-        # Dynamically discover available tools
-        available_tools = discover_review_tools()
-        tool_ids = set(available_tools.keys())
-        
-        tools_map = {}
-        for step in process_definition.get("steps", []):
-            comp_id = step.get("component_id")
-            if comp_id in tool_ids:
-                tools_map[step["id"]] = {comp_id: step.get("config", {})}
-        
-        for step in process_definition.get("steps", []):
-            comp_id = step.get("component_id")
-            config = step.get("config", {})
-            
-            if comp_id == "paper_loader":
-                review_process_def["paper_loader"]["config"] = config
-            elif comp_id == "question_reviewer":
-                if "tools" not in config:
-                    config["tools"] = []
-                for t in tools_map.values():
-                    config["tools"].append(t)
-                review_process_def["question_reviewer"]["config"] = config
-            elif comp_id == "md_writer":
-                review_process_def["post_processors"].append({
-                    "id": "md_writer",
-                    "config": config
-                })
-            elif comp_id == "pdf_writer":
-                review_process_def["post_processors"].append({
-                    "id": "pdf_writer",
-                    "config": config
-                })
-            elif comp_id == "json_writer":
-                review_process_def["post_processors"].append({
-                    "id": "json_writer",
-                    "config": config
-                })
         
         for idx, paper in enumerate(task.papers):
             if task.stop_event.is_set():
@@ -1879,14 +1714,15 @@ def _run_review_process_background(task_id: str, collections_root):
                 process_instance = ReviewProcess(
                     review_process_def,
                     stop_event=task.stop_event,
-                    log_callback=add_log_message
+                    log_callback=add_log_message,
+                    collections_root=collections_root,
                 )
                 run_result = process_instance.execute(
                     collection_name=task.collection_name,
-                    paper_name=paper_name,
-                    checklist_name=checklist_name,
-                    paper_index=idx + 1,
-                    total_papers=len(task.papers)
+                    artifact_name=paper_name,
+                    criteria_set_name=checklist_name,
+                    artifact_index=idx + 1,
+                    total_artifacts=len(task.papers),
                 )
                 if task.stop_event.is_set():
                     task.progress.status = TaskStatus.STOPPED
@@ -2019,49 +1855,15 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
         checklist_name = Path(checklist_name).stem
 
     try:
-        steps = _convert_flow_to_steps(process_data)
+        review_process_def = _resolve_review_process_definition(process_name, process_data)
     except Exception as e:
-        logger.error(f"Error converting flow to steps: {e}", exc_info=True)
-        add_log_message(f"Error: Failed to convert process data: {str(e)}", "error")
+        logger.error(f"Error loading pipeline: {e}", exc_info=True)
+        add_log_message(f"Error: Failed to load pipeline: {str(e)}", "error")
         progress["status"] = TaskStatus.FAILED.value
         progress["error"] = str(e)
         progress["completed_at"] = datetime.now().isoformat()
         tp.write_progress(collections_root, task_id, progress)
         return
-
-    execution_name = process_name or f"Executed Process {datetime.now().isoformat()}"
-    process_definition = {"name": execution_name, "steps": steps}
-    review_process_def = {
-        "name": execution_name,
-        "config": {"separate_questions": True},
-        "paper_loader": {},
-        "question_reviewer": {},
-        "post_processors": [],
-    }
-    available_tools = discover_review_tools()
-    tool_ids = set(available_tools.keys())
-    tools_map = {}
-    for step in process_definition.get("steps", []):
-        comp_id = step.get("component_id")
-        if comp_id in tool_ids:
-            tools_map[step["id"]] = {comp_id: step.get("config", {})}
-    for step in process_definition.get("steps", []):
-        comp_id = step.get("component_id")
-        config = step.get("config", {})
-        if comp_id == "paper_loader":
-            review_process_def["paper_loader"]["config"] = config
-        elif comp_id == "question_reviewer":
-            if "tools" not in config:
-                config["tools"] = []
-            for t in tools_map.values():
-                config["tools"].append(t)
-            review_process_def["question_reviewer"]["config"] = config
-        elif comp_id == "md_writer":
-            review_process_def["post_processors"].append({"id": "md_writer", "config": config})
-        elif comp_id == "pdf_writer":
-            review_process_def["post_processors"].append({"id": "pdf_writer", "config": config})
-        elif comp_id == "json_writer":
-            review_process_def["post_processors"].append({"id": "json_writer", "config": config})
 
     for idx, paper in enumerate(papers):
         if stop_event.is_set():
@@ -2089,10 +1891,10 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
             )
             run_result = process_instance.execute(
                 collection_name=collection_name,
-                paper_name=paper_name,
-                checklist_name=checklist_name,
-                paper_index=idx + 1,
-                total_papers=len(papers),
+                artifact_name=paper_name,
+                criteria_set_name=checklist_name,
+                artifact_index=idx + 1,
+                total_artifacts=len(papers),
             )
             if stop_event.is_set():
                 progress["status"] = TaskStatus.STOPPED.value

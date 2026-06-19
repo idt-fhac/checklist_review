@@ -1,0 +1,36 @@
+# LLM and embedding providers. API keys are read from environment variables.
+providers:
+  - id: primary_llm
+    name: Primary LLM
+    type: litellm
+    model_name: gpt-4o
+    base_url: http://localhost:4000
+    api_key_env: OPENAI_API_KEY
+
+  - id: ollama_local
+    name: Ollama Local
+    type: ollama
+    base_url: http://localhost:11434
+    model_name: llama3.2
+
+  - id: gemini_default
+    name: Google Gemini
+    type: gemini
+    model_name: gemini-2.5-flash
+    api_key_env: GOOGLE_API_KEY
+
+  - id: embedding_ollama
+    name: Ollama Embeddings
+    type: ollama
+    base_url: http://localhost:11434
+    model_name: mbxai-embed-large:latest
+    is_embedding_model: true
+
+defaults:
+  pdf_metadata: primary_llm
+  criteria_extraction: primary_llm
+  criterion_evaluator: primary_llm
+  embedding: embedding_ollama
+
+pdf_metadata:
+  method: llm  # llm | rule_based

@@ -22,17 +22,13 @@ def create_app() -> Flask:
     from src.web.collection.routes import collection_bp
     from src.web.checklist_review.routes import checklist_review_bp
     from src.web.analysis.routes import analysis_bp
-    from src.web.human_verification.routes import human_verification_bp
     from src.web.settings.routes import settings_bp
-    from src.web.review_process_design.routes import review_process_design_bp
     from src.web.workspace.routes import workspace_bp
 
     app.register_blueprint(base_bp)
     app.register_blueprint(collection_bp)
     app.register_blueprint(checklist_review_bp)
     app.register_blueprint(analysis_bp)
-    app.register_blueprint(human_verification_bp)
-    app.register_blueprint(review_process_design_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(workspace_bp)
 
@@ -57,13 +53,10 @@ def create_app() -> Flask:
         settings = SettingsManager.load_settings()
         default_page = settings.get("default_page", "checklist_review")
         
-        # Map page names to route names
         page_routes = {
             "checklist_review": "checklist_review.index",
             "collection": "collection.index",
             "analysis": "analysis.index",
-            "human_verification": "human_verification.index",
-            "review_process_design": "review_process_design.index",
             "settings": "settings.index",
         }
         

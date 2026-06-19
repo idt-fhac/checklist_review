@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 import requests
 
-from src.web.settings.services import SettingsManager
+from src.core.providers import get_provider, get_provider_for_purpose, load_all_providers
 
 
 class Embedding:
@@ -14,15 +14,13 @@ class Embedding:
     ):
         """
         embedding_provider_id: when set (non-empty), use this provider (e.g. for RAG).
-        use_visualization_settings: when True and no embedding_provider_id, use visualization embedding from settings.
+        use_visualization_settings: when True and no embedding_provider_id, use default embedding from config.
         """
-        settings = SettingsManager.load_settings()
-        secrets = SettingsManager.load_secrets()
 
         if embedding_provider_id:
             self._embedding_type = "provider"
             self._vectorizer = None
-            provider = next((p for p in secrets if p.get("id") == embedding_provider_id), None)
+            provider = get_provider(embedding_provider_id)
             if provider:
                 self._base_url = provider.get("base_url", "").rstrip("/")
                 self._model = provider.get("model_name") or ""
@@ -31,49 +29,30 @@ class Embedding:
                 self._provider_api_key = provider.get("api_key")
                 self._provider_port = provider.get("port")
             else:
-                raise ValueError(f"Embedding provider '{embedding_provider_id}' not found in settings.")
+                raise ValueError(
+                    f"Embedding provider '{embedding_provider_id}' not found in config/providers.yaml."
+                )
         elif use_visualization_settings:
-            self._embedding_type = settings.get("embedding_model_type", "tfidf")
-            embedding_provider_id_from_settings = settings.get("embedding_provider_id")
-            if self._embedding_type == "provider" and embedding_provider_id_from_settings:
-                provider = next((p for p in secrets if p.get("id") == embedding_provider_id_from_settings), None)
-                if provider:
-                    self._base_url = provider.get("base_url", "").rstrip("/")
-                    self._model = provider.get("model_name") or ""
-                    self._provider_type = provider.get("type", "ollama")
-                    self._embedding_provider_id = embedding_provider_id_from_settings
-                    self._provider_api_key = provider.get("api_key")
-                    self._provider_port = provider.get("port")
-                else:
-                    self._embedding_type = "tfidf"
-                    self._base_url = None
-                    self._model = None
-                    self._provider_type = None
-                    self._embedding_provider_id = None
-                    self._provider_api_key = None
-                    self._provider_port = None
+            default_embedding = get_provider_for_purpose("embedding")
+            if default_embedding:
+                self._embedding_type = "provider"
+                self._base_url = default_embedding.get("base_url", "").rstrip("/")
+                self._model = default_embedding.get("model_name") or ""
+                self._provider_type = default_embedding.get("type", "ollama")
+                self._embedding_provider_id = default_embedding.get("id")
+                self._provider_api_key = default_embedding.get("api_key")
+                self._provider_port = default_embedding.get("port")
+                self._vectorizer = None
             else:
+                self._embedding_type = "tfidf"
+                self._vectorizer = TfidfVectorizer(max_features=512, stop_words="english")
+                self._fitted = False
                 self._base_url = None
                 self._model = None
                 self._provider_type = None
                 self._embedding_provider_id = None
                 self._provider_api_key = None
                 self._provider_port = None
-
-            if self._embedding_type != "provider" and self._embedding_type != "tfidf":
-                self._model = settings.get("embedding_ollama_model") or "mbxai-embed-large:latest"
-                ollama_providers = [p for p in secrets if p.get("type") == "ollama"]
-                self._base_url = (ollama_providers[0]["base_url"] if ollama_providers else "http://localhost:11434").rstrip("/")
-                self._provider_type = "ollama"
-                self._embedding_provider_id = None
-                self._provider_api_key = None
-                self._provider_port = None
-
-            if self._embedding_type == "tfidf":
-                self._vectorizer = TfidfVectorizer(max_features=512, stop_words="english")
-                self._fitted = False
-            else:
-                self._vectorizer = None
         else:
             raise ValueError("Embedding requires either embedding_provider_id or use_visualization_settings=True.")
 

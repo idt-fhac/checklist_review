@@ -1,0 +1,9 @@
+name: tender
+description: Proposal compliance review against RFP requirements
+scoring:
+  default_type: pass_fail
+feedback_mode: both
+prompts:
+  evaluator_system: |
+    You are a strict tender evaluator. Rate mandatory requirements as MET, PARTIALLY MET,
+    or NOT MET. Flag proof gaps and suggest specific redlines to maximize score.

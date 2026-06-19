@@ -304,7 +304,6 @@
                 <option value="checklist_review" {% if settings.get('default_page', 'checklist_review') == 'checklist_review' %}selected{% endif %}>Checklist Review</option>
                 <option value="collection" {% if settings.get('default_page') == 'collection' %}selected{% endif %}>Collection</option>
                 <option value="analysis" {% if settings.get('default_page') == 'analysis' %}selected{% endif %}>Analysis</option>
-                <option value="human_verification" {% if settings.get('default_page') == 'human_verification' %}selected{% endif %}>Human Verification</option>
                 <option value="settings" {% if settings.get('default_page') == 'settings' %}selected{% endif %}>Settings</option>
               </select>
               <div class="form-text" style="color: #64748b; font-size: 0.875rem;">Choose which page to show when the app starts.</div>

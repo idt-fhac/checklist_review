@@ -1,0 +1,24 @@
+name: tender_full
+profile: tender
+stages:
+  - document_loader:
+      extraction_method: Extracted Content
+      force_execution: false
+  - criteria_extractor:
+      source: rfp
+      output: criteria.json
+      provider: primary_llm
+  - section_mapper:
+      strategy: heading_match
+  - criterion_evaluator:
+      provider: primary_llm
+      scoring: pass_fail
+      use_search: false
+      force_review: true
+  - feedback_synthesizer:
+      persona: editor
+      provider: primary_llm
+  - report_writer:
+      component: pdf_writer
+      formats: [json, pdf]
+      save_details: true
