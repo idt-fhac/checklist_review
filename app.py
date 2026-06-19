@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from flask import Flask, redirect, url_for, send_from_directory
+from flask import Flask, jsonify
 
 
 def create_app() -> Flask:
@@ -18,50 +18,37 @@ def create_app() -> Flask:
         OUTPUT_DIR=output_dir,
     )
 
-    from src.web.base.routes import base_bp
-    from src.web.collection.routes import collection_bp
-    from src.web.checklist_review.routes import checklist_review_bp
-    from src.web.analysis.routes import analysis_bp
-    from src.web.settings.routes import settings_bp
-    from src.web.workspace.routes import workspace_bp
+    from src.web.api.routes import api_v1_bp
 
-    app.register_blueprint(base_bp)
-    app.register_blueprint(collection_bp)
-    app.register_blueprint(checklist_review_bp)
-    app.register_blueprint(analysis_bp)
-    app.register_blueprint(settings_bp)
-    app.register_blueprint(workspace_bp)
+    app.register_blueprint(api_v1_bp)
 
-    from src.core.workspace import (
-        ensure_guest_workspace_initialized,
-        get_active_workspace,
-        list_workspaces,
-    )
+    from src.core.workspace import ensure_guest_workspace_initialized
 
     ensure_guest_workspace_initialized()
 
-    @app.context_processor
-    def inject_workspace_data():
-        return dict(
-            workspaces=list_workspaces(),
-            active_workspace=get_active_workspace()
+    @app.get("/")
+    def index():
+        return jsonify(
+            {
+                "name": "checklist_reviewer",
+                "api_version": "v1",
+                "base_path": "/api/v1",
+                "docs": {
+                    "pipelines": "GET /api/v1/pipelines",
+                    "create_collection": "POST /api/v1/collections",
+                    "upload_rfp": "POST /api/v1/collections/{name}/documents (form: file, role=rfp)",
+                    "upload_draft": "POST /api/v1/collections/{name}/documents (form: file, role=artifact)",
+                    "reference_links": "PUT /api/v1/collections/{name}/references",
+                    "start_review": "POST /api/v1/reviews",
+                    "review_status": "GET /api/v1/reviews/{id}",
+                    "review_report": "GET /api/v1/reviews/{id}/report",
+                },
+            }
         )
 
-    @app.route("/")
-    def index():
-        from src.web.settings.services import SettingsManager
-        settings = SettingsManager.load_settings()
-        default_page = settings.get("default_page", "checklist_review")
-        
-        page_routes = {
-            "checklist_review": "checklist_review.index",
-            "collection": "collection.index",
-            "analysis": "analysis.index",
-            "settings": "settings.index",
-        }
-        
-        route_name = page_routes.get(default_page, "checklist_review.index")
-        return redirect(url_for(route_name))
+    @app.get("/health")
+    def health():
+        return jsonify({"status": "ok"})
 
     return app
 

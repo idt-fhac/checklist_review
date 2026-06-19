@@ -42,6 +42,46 @@ def get_evaluations_file_path(
     return artifact_dir / "evaluations.json"
 
 
+def get_persona_evaluations_dir(
+    collection_name: str,
+    pipeline_name: str,
+    artifact_name: str,
+    criteria_set_name: str | None = None,
+    collections_root: Path | None = None,
+) -> Path:
+    base_dir = get_evaluations_file_path(
+        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
+    ).parent
+    directory = base_dir / "persona_evaluations"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def get_persona_evaluations_file_path(
+    collection_name: str,
+    pipeline_name: str,
+    artifact_name: str,
+    persona_id: str,
+    criteria_set_name: str | None = None,
+    collections_root: Path | None = None,
+) -> Path:
+    return get_persona_evaluations_dir(
+        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
+    ) / f"{persona_id}.json"
+
+
+def get_persona_manifest_path(
+    collection_name: str,
+    pipeline_name: str,
+    artifact_name: str,
+    criteria_set_name: str | None = None,
+    collections_root: Path | None = None,
+) -> Path:
+    return get_persona_evaluations_dir(
+        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
+    ) / "manifest.json"
+
+
 def load_existing_evaluations(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}

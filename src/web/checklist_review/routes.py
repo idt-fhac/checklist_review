@@ -18,6 +18,7 @@ from src.core.task_manager import TaskManager, TaskStatus
 from src.core import task_persistence
 from src.review_workflow.engine.review_process import ReviewProcess
 from src.review_workflow.engine.pipeline_loader import build_review_process_definition
+from src.review_workflow.review_runner import run_review_subprocess
 
 checklist_review_bp = Blueprint("checklist_review", __name__, url_prefix="/checklist_review", template_folder="templates")
 logger = logging.getLogger(__name__)
@@ -1266,7 +1267,7 @@ def api_start_review():
             )
             task.progress.status = TaskStatus.RUNNING
             task.process = multiprocessing.Process(
-                target=_run_review_process_background_subprocess,
+                target=run_review_subprocess,
                 args=(task_id, str(collections_root)),
                 daemon=False,
             )
@@ -1592,157 +1593,4 @@ def _run_review_process_background(task_id: str, collections_root):
                 logger.error(f"Could not find task {task_id} to mark as failed")
         except Exception as inner_e:
             logger.error(f"Error updating task status after failure: {inner_e}", exc_info=True)
-
-
-def _run_review_process_background_subprocess(task_id: str, collections_root: Path):
-    """
-    Entry point for the review process when run in a separate process.
-    Loads task from file, uses file-based progress and stop signal, so it
-    survives Flask reload (e.g. when using tools like github_checker that trigger
-    long LLM calls and reload can shut down the main process executor).
-    """
-    from src.core import task_persistence as tp
-
-    collections_root = Path(collections_root)
-    payload = tp.read_task_payload(collections_root, task_id)
-    if not payload:
-        logger.error(f"Subprocess: task {task_id} payload not found in file")
-        return
-
-    artifacts = payload.get("artifacts", [])
-    collection_name = payload.get("collection_name", "")
-    pipeline_id = payload.get("pipeline_id", "")
-    criteria_set_name = payload.get("criteria_set_name", "")
-
-    if tp.stop_requested(collections_root, task_id):
-        logger.info(f"Task {task_id} stop requested before start")
-        tp.write_progress(collections_root, task_id, {
-            **payload.get("progress", {}),
-            "status": TaskStatus.STOPPED.value,
-            "completed_at": datetime.now().isoformat(),
-        })
-        return
-
-    progress = dict(payload.get("progress", {}))
-    progress["status"] = TaskStatus.RUNNING.value
-    progress["started_at"] = progress.get("started_at") or datetime.now().isoformat()
-    progress["total"] = len(artifacts)
-    tp.write_progress(collections_root, task_id, progress)
-
-    stop_event = threading.Event()
-
-    def stop_poller():
-        while not stop_event.is_set():
-            if tp.stop_requested(collections_root, task_id):
-                stop_event.set()
-                return
-            time.sleep(0.5)
-
-    poller_thread = threading.Thread(target=stop_poller, daemon=True)
-    poller_thread.start()
-
-    def add_log_message(message: str, level: str = "info"):
-        progress["log_messages"] = progress.get("log_messages") or []
-        progress["log_messages"].append({
-            "timestamp": datetime.now().isoformat(),
-            "message": message,
-            "level": level,
-        })
-        tp.write_progress(collections_root, task_id, progress)
-
-    if criteria_set_name and ("/" in criteria_set_name or "\\" in criteria_set_name):
-        criteria_set_name = Path(criteria_set_name).stem
-
-    try:
-        review_process_def = build_review_process_definition(pipeline_id)
-    except Exception as e:
-        logger.error(f"Error loading pipeline: {e}", exc_info=True)
-        add_log_message(f"Error: Failed to load pipeline: {str(e)}", "error")
-        progress["status"] = TaskStatus.FAILED.value
-        progress["error"] = str(e)
-        progress["completed_at"] = datetime.now().isoformat()
-        tp.write_progress(collections_root, task_id, progress)
-        return
-
-    for idx, artifact in enumerate(artifacts):
-        if stop_event.is_set():
-            progress["status"] = TaskStatus.STOPPED.value
-            progress["completed_at"] = datetime.now().isoformat()
-            progress["current"] = idx
-            tp.write_progress(collections_root, task_id, progress)
-            logger.info(f"Task {task_id} stopped at paper {idx + 1}/{len(artifacts)}")
-            return
-
-        artifact_name = artifact.get("filename")
-        if not artifact_name:
-            continue
-
-        progress["current"] = idx
-        progress["current_item"] = artifact_name
-        tp.write_progress(collections_root, task_id, progress)
-
-        try:
-            process_instance = ReviewProcess(
-                review_process_def,
-                stop_event=stop_event,
-                log_callback=add_log_message,
-                collections_root=collections_root,
-            )
-            run_result = process_instance.execute(
-                collection_name=collection_name,
-                artifact_name=artifact_name,
-                criteria_set_name=criteria_set_name,
-                artifact_index=idx + 1,
-                total_artifacts=len(artifacts),
-            )
-            if stop_event.is_set():
-                progress["status"] = TaskStatus.STOPPED.value
-                progress["completed_at"] = datetime.now().isoformat()
-                progress["current"] = idx + 1
-                tp.write_progress(collections_root, task_id, progress)
-                return
-            progress["results"] = progress.get("results") or []
-            result_entry = {
-                "artifact_id": artifact.get("artifact_id", artifact_name),
-                "filename": artifact_name,
-                "status": "completed",
-            }
-            if run_result and run_result.get("token_usage"):
-                result_entry["token_usage"] = run_result["token_usage"]
-            progress["results"].append(result_entry)
-        except InterruptedError:
-            progress["status"] = TaskStatus.STOPPED.value
-            progress["completed_at"] = datetime.now().isoformat()
-            add_log_message("Review stopped by user", "warning")
-            progress["results"] = progress.get("results") or []
-            progress["results"].append({
-                "artifact_id": artifact.get("artifact_id", artifact_name),
-                "filename": artifact_name,
-                "status": "stopped",
-                "error": "Stopped by user",
-            })
-            tp.write_progress(collections_root, task_id, progress)
-            return
-        except Exception as e:
-            logger.error(f"Failed to process {artifact_name}: {e}", exc_info=True)
-            add_log_message(f"Error processing paper: {str(e)}", "error")
-            progress["results"] = progress.get("results") or []
-            progress["results"].append({
-                "artifact_id": artifact.get("artifact_id", artifact_name),
-                "filename": artifact_name,
-                "status": "failed",
-                "error": str(e),
-            })
-            tp.write_progress(collections_root, task_id, progress)
-            if stop_event.is_set():
-                progress["status"] = TaskStatus.STOPPED.value
-                progress["completed_at"] = datetime.now().isoformat()
-                tp.write_progress(collections_root, task_id, progress)
-                return
-
-    progress["status"] = TaskStatus.COMPLETED.value
-    progress["current"] = len(artifacts)
-    progress["completed_at"] = datetime.now().isoformat()
-    tp.write_progress(collections_root, task_id, progress)
-    logger.info(f"Task {task_id} completed successfully")
 

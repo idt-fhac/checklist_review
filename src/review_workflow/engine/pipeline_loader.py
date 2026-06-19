@@ -82,15 +82,101 @@ def _resolve_provider_fields(config: Dict[str, Any]) -> Dict[str, Any]:
         resolved["rag_embedding_provider_id"] = embedding_ref
     profile = resolved.pop("_profile_prompts", None)
     stage = resolved.pop("_stage", None)
+    persona_id = resolved.get("persona")
     if profile and not resolved.get("system_prompt"):
         prompts = profile.get("prompts") or {}
-        if stage == "criteria_extractor" and prompts.get("extractor_system"):
+        prompt_key = resolved.get("prompt_key")
+        if prompt_key and prompts.get(prompt_key):
+            resolved["system_prompt"] = prompts[prompt_key]
+        elif stage == "criteria_extractor" and prompts.get("extractor_system"):
             resolved["system_prompt"] = prompts["extractor_system"]
         elif stage == "feedback_synthesizer" and prompts.get("synthesizer_system"):
             resolved["system_prompt"] = prompts["synthesizer_system"]
+        elif persona_id and prompts.get(f"{persona_id}_system"):
+            resolved["system_prompt"] = prompts[f"{persona_id}_system"]
         elif prompts.get("evaluator_system"):
             resolved["system_prompt"] = prompts["evaluator_system"]
     return resolved
+
+
+def _resolve_persona_definition(
+    persona_cfg: Dict[str, Any],
+    profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    persona_id = persona_cfg.get("id") or persona_cfg.get("persona")
+    if not persona_id:
+        raise ValueError("Each persona requires an id")
+
+    prompts = profile.get("prompts") or {}
+    system_prompt = persona_cfg.get("system_prompt")
+    prompt_key = persona_cfg.get("prompt_key")
+    if not system_prompt and prompt_key:
+        system_prompt = prompts.get(prompt_key)
+    if not system_prompt:
+        system_prompt = prompts.get(f"{persona_id}_system")
+    if not system_prompt:
+        system_prompt = prompts.get("evaluator_system")
+
+    return {
+        "id": str(persona_id),
+        "label": persona_cfg.get("label") or str(persona_id).replace("_", " ").title(),
+        "weight": float(persona_cfg.get("weight", 1.0)),
+        "system_prompt": system_prompt or "",
+    }
+
+
+def _build_evaluation_plan(steps: List[Dict[str, Any]], profile: Dict[str, Any]) -> Dict[str, Any]:
+    evaluator_steps = [step for step in steps if step.get("component_id") == "criterion_evaluator"]
+    if not evaluator_steps:
+        return {
+            "mode": "single",
+            "personas": [],
+            "merge_strategy": "weighted",
+            "keep_persona_scores": False,
+            "base_config": {},
+        }
+
+    first_config = dict(evaluator_steps[0].get("config") or {})
+    merge_strategy = first_config.get("merge_strategy", "weighted")
+    keep_persona_scores = bool(first_config.get("keep_persona_scores", True))
+
+    if len(evaluator_steps) == 1 and first_config.get("personas"):
+        personas = [
+            _resolve_persona_definition(persona, profile)
+            for persona in first_config.get("personas") or []
+            if isinstance(persona, dict)
+        ]
+        mode = first_config.get("evaluation_mode") or ("multi_persona" if personas else "single")
+        base_config = dict(first_config)
+        base_config.pop("personas", None)
+        return {
+            "mode": mode if personas else "single",
+            "personas": personas,
+            "merge_strategy": merge_strategy,
+            "keep_persona_scores": keep_persona_scores,
+            "base_config": base_config,
+        }
+
+    if len(evaluator_steps) > 1:
+        personas = []
+        for step in evaluator_steps:
+            personas.append(_resolve_persona_definition(step.get("config") or {}, profile))
+        base_config = dict(first_config)
+        return {
+            "mode": "multi_persona",
+            "personas": personas,
+            "merge_strategy": merge_strategy,
+            "keep_persona_scores": keep_persona_scores,
+            "base_config": base_config,
+        }
+
+    return {
+        "mode": "single",
+        "personas": [],
+        "merge_strategy": merge_strategy,
+        "keep_persona_scores": False,
+        "base_config": first_config,
+    }
 
 
 def pipeline_to_steps(pipeline: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -180,6 +266,7 @@ def build_review_process_definition(
         "criterion_evaluator": {},
         "feedback_synthesizer": {},
         "post_processors": [],
+        "evaluation": {},
     }
 
     available_tools = discover_review_tools()
@@ -202,14 +289,19 @@ def build_review_process_definition(
         elif comp_id == "section_mapper":
             review_process_def["section_mapper"] = {"config": config}
         elif comp_id == "criterion_evaluator":
-            config.setdefault("tools", [])
-            for tool_cfg in tools_map.values():
-                config["tools"].append(tool_cfg)
-            review_process_def["criterion_evaluator"] = {"config": config}
+            continue
         elif comp_id == "feedback_synthesizer":
             review_process_def["feedback_synthesizer"] = {"config": config}
         elif comp_id in ("md_writer", "pdf_writer", "json_writer"):
             review_process_def["post_processors"].append({"id": comp_id, "config": config})
+
+    evaluation_plan = _build_evaluation_plan(steps, pipeline.get("_profile") or {})
+    base_config = dict(evaluation_plan.get("base_config") or {})
+    base_config.setdefault("tools", [])
+    for tool_cfg in tools_map.values():
+        base_config["tools"].append(tool_cfg)
+    review_process_def["evaluation"] = evaluation_plan
+    review_process_def["criterion_evaluator"] = {"config": base_config}
 
     return review_process_def
 

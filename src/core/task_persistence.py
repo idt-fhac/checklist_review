@@ -82,6 +82,8 @@ def write_task_payload(
     criteria_set_name: str,
     artifacts: list,
     progress: Optional[Dict[str, Any]] = None,
+    criteria_source_name: Optional[str] = None,
+    reference_urls: Optional[List[str]] = None,
 ) -> Path:
     path = task_file_path(collections_root, task_id)
     payload = {
@@ -102,6 +104,10 @@ def write_task_payload(
             "log_messages": [],
         },
     }
+    if criteria_source_name:
+        payload["criteria_source_name"] = criteria_source_name
+    if reference_urls:
+        payload["reference_urls"] = reference_urls
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, default=str)
     return path

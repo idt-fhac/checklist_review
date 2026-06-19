@@ -10,6 +10,7 @@ from src.review_workflow.components.evaluators.criterion_evaluator.helpers impor
 from src.review_workflow.components.evaluators.criterion_evaluator.file_utils import (
     get_artifact_file_paths,
     get_evaluations_file_path,
+    get_persona_evaluations_file_path,
     load_existing_evaluations,
     save_evaluations,
 )
@@ -49,6 +50,7 @@ class CriterionEvaluator(BaseComponent):
                 collection_name, pipeline_name, artifact_name, criteria_set_name,
                 criteria, log_callback, token_usage_accumulator, collections_root,
                 inputs.get("section_mapping"),
+                inputs.get("reference_urls") or [],
             )
         if not criterion:
             return self._log_error("'criterion' or 'criteria' is required", log_callback)
@@ -56,7 +58,16 @@ class CriterionEvaluator(BaseComponent):
             collection_name, pipeline_name, artifact_name, criteria_set_name,
             criterion, log_callback, token_usage_accumulator, collections_root,
             inputs.get("section_mapping"),
+            inputs.get("reference_urls") or [],
+            inputs.get("persona_id"),
+            inputs.get("config_override"),
         )
+    
+    def _append_reference_urls(self, prompt: str, reference_urls: List[str]) -> str:
+        if not reference_urls:
+            return prompt
+        lines = "\n".join(f"- {url}" for url in reference_urls)
+        return f"{prompt}\n\nSupplementary reference links provided for this review:\n{lines}\n"
     
     def _apply_section_mapping(
         self,
@@ -75,12 +86,45 @@ class CriterionEvaluator(BaseComponent):
             return clean_text_for_encoding(excerpt), []
         return md_content, artifact_pages
 
+    def _runtime_config(self, config_override: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        runtime = dict(self.config)
+        if config_override:
+            runtime.update(config_override)
+        return runtime
+
+    def _resolve_evaluations_file(
+        self,
+        collection_name: str,
+        pipeline_name: str,
+        artifact_name: str,
+        criteria_set_name: str,
+        collections_root: Optional[Path],
+        persona_id: Optional[str],
+    ) -> Path:
+        if persona_id:
+            return get_persona_evaluations_file_path(
+                collection_name,
+                pipeline_name,
+                artifact_name,
+                persona_id,
+                criteria_set_name,
+                collections_root,
+            )
+        return get_evaluations_file_path(
+            collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
+        )
+
     def _execute_single(self, collection_name: str, pipeline_name: str, artifact_name: str,
                         criteria_set_name: str, criterion: Dict[str, Any], log_callback,
                         token_usage_accumulator: Optional[Dict[str, Any]] = None,
                         collections_root: Optional[Path] = None,
-                        section_mapping: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
+                        section_mapping: Optional[Dict[str, Any]] = None,
+                        reference_urls: Optional[List[str]] = None,
+                        persona_id: Optional[str] = None,
+                        config_override: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        evaluations_file = self._resolve_evaluations_file(
+            collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root, persona_id
+        )
         existing = load_existing_evaluations(evaluations_file)
 
         criterion_id = criterion.get("id")
@@ -122,6 +166,7 @@ class CriterionEvaluator(BaseComponent):
         
         provider_config = self._get_provider_config(self.config.get("provider_id"))
         prompt = build_prompt_with_pages(criterion_text, context_content, context_pages)
+        prompt = self._append_reference_urls(prompt, reference_urls or [])
         prompt = clean_text_for_encoding(prompt)
         context = {
             "collection_name": collection_name,
@@ -132,10 +177,13 @@ class CriterionEvaluator(BaseComponent):
             "token_usage_accumulator": token_usage_accumulator,
             "collections_root": collections_root,
         }
-        agent = create_review_agent(provider_config, self.config, artifact_pages, context=context)
+        runtime_config = self._runtime_config(config_override)
+        agent = create_review_agent(provider_config, runtime_config, artifact_pages, context=context)
         result = self._get_review_result(agent, prompt, provider_config, log_callback, token_usage_accumulator)
         result["criterion_id"] = criterion_id
         result["criterion_text"] = criterion.get("description") or criterion.get("text", "")
+        if persona_id:
+            result["persona_id"] = persona_id
         result["supporting_texts"] = enhance_supporting_texts_with_highlighting(result.get("supporting_texts", []), artifact_pages)
         
         existing_evaluations[criterion_id] = result
@@ -147,7 +195,8 @@ class CriterionEvaluator(BaseComponent):
                        criteria_set_name: str, criteria: List[Dict[str, Any]], log_callback,
                        token_usage_accumulator: Optional[Dict[str, Any]] = None,
                        collections_root: Optional[Path] = None,
-                       section_mapping: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                       section_mapping: Optional[Dict[str, Any]] = None,
+                       reference_urls: Optional[List[str]] = None) -> Dict[str, Any]:
         evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
         existing_evaluations = load_existing_evaluations(evaluations_file)
         
@@ -196,6 +245,7 @@ class CriterionEvaluator(BaseComponent):
         
         provider_config = self._get_provider_config(self.config.get("provider_id"))
         prompt = build_batch_prompt(questions_to_answer, context_content, context_pages)
+        prompt = self._append_reference_urls(prompt, reference_urls or [])
         prompt = clean_text_for_encoding(prompt)
         context = {
             "collection_name": collection_name,

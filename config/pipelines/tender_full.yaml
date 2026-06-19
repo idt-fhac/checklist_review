@@ -13,8 +13,24 @@ stages:
   - criterion_evaluator:
       provider: primary_llm
       scoring: pass_fail
+      evaluation_mode: multi_persona
+      merge_strategy: weighted
+      keep_persona_scores: true
       use_search: false
       force_review: true
+      personas:
+        - id: critic
+          label: Black-Hat Evaluator
+          weight: 0.35
+          prompt_key: critic_system
+        - id: expert
+          label: Domain Expert
+          weight: 0.35
+          prompt_key: expert_system
+        - id: compliance
+          label: Compliance Reviewer
+          weight: 0.30
+          prompt_key: compliance_system
   - feedback_synthesizer:
       persona: editor
       provider: primary_llm

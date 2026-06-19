@@ -14,6 +14,13 @@ from src.review_workflow.components.post_process.pdf_writer.component import Pdf
 from src.review_workflow.components.post_process.json_writer.component import JsonWriter
 from src.review_workflow.engine.base import BaseComponent
 from src.review_workflow.engine.token_usage import create_accumulator, get_summary
+from src.review_workflow.engine.evaluation_merger import merge_criterion_results, normalize_persona_weights
+from src.review_workflow.components.evaluators.criterion_evaluator.file_utils import (
+    get_evaluations_file_path,
+    get_persona_manifest_path,
+    load_existing_evaluations,
+    save_evaluations,
+)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ReviewProcess")
@@ -37,6 +44,11 @@ class ReviewProcess:
         self.section_mapper = self._init_optional(process_definition.get("section_mapper", {}), SectionMapper)
         self.criterion_evaluator = self._init_component(process_definition.get("criterion_evaluator", {}), CriterionEvaluator)
         self.feedback_synthesizer = self._init_optional(process_definition.get("feedback_synthesizer", {}), FeedbackSynthesizer)
+        self.evaluation_plan = process_definition.get("evaluation") or {}
+        self.evaluation_mode = self.evaluation_plan.get("mode", "single")
+        self.evaluation_personas = normalize_persona_weights(self.evaluation_plan.get("personas") or [])
+        self.merge_strategy = self.evaluation_plan.get("merge_strategy", "weighted")
+        self.keep_persona_scores = bool(self.evaluation_plan.get("keep_persona_scores", True))
 
         self.post_processors: List[BaseComponent] = []
         for pp_def in process_definition.get("post_processors", []):
@@ -96,6 +108,7 @@ class ReviewProcess:
         artifact_index: int | None = None,
         total_artifacts: int | None = None,
         criteria_source_name: str | None = None,
+        reference_urls: List[str] | None = None,
     ):
         if self.stop_event and self.stop_event.is_set():
             raise InterruptedError("Review process stopped by user")
@@ -187,6 +200,7 @@ class ReviewProcess:
             "log_callback": self.log_callback,
             "token_usage_accumulator": token_usage_accumulator,
             "section_mapping": None,
+            "reference_urls": reference_urls or [],
         }
 
         if self.section_mapper:
@@ -196,15 +210,7 @@ class ReviewProcess:
             })
             run_context["section_mapping"] = mapping_result.get("mapping")
 
-        if self.criterion_evaluator.config.get("answer_all_together", False):
-            self.criterion_evaluator.execute({**run_context, "criteria": criteria})
-        else:
-            for idx, criterion in enumerate(criteria, 1):
-                if self.stop_event and self.stop_event.is_set():
-                    raise InterruptedError("Review process stopped by user")
-                if self.log_callback:
-                    self.log_callback(f"Evaluating criterion {idx}/{len(criteria)}", "info")
-                self.criterion_evaluator.execute({**run_context, "criterion": criterion})
+        self._run_criterion_evaluations(run_context, criteria)
 
         if self.feedback_synthesizer:
             self.feedback_synthesizer.execute({
@@ -230,3 +236,132 @@ class ReviewProcess:
             self.log_callback("Review ended", "info")
 
         return {"token_usage": token_usage}
+
+    def _write_persona_manifest(
+        self,
+        collection_name: str,
+        artifact_name: str,
+        criteria_set_name: str,
+    ) -> None:
+        if self.evaluation_mode != "multi_persona" or not self.evaluation_personas:
+            return
+        manifest_path = get_persona_manifest_path(
+            collection_name,
+            self.pipeline_name,
+            artifact_name,
+            criteria_set_name,
+            self.collections_root,
+        )
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "evaluation_mode": self.evaluation_mode,
+                    "merge_strategy": self.merge_strategy,
+                    "keep_persona_scores": self.keep_persona_scores,
+                    "personas": self.evaluation_personas,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+    def _criterion_already_evaluated(
+        self,
+        collection_name: str,
+        artifact_name: str,
+        criteria_set_name: str,
+        criterion_id: Any,
+    ) -> bool:
+        merged_file = get_evaluations_file_path(
+            collection_name,
+            self.pipeline_name,
+            artifact_name,
+            criteria_set_name,
+            self.collections_root,
+        )
+        merged = load_existing_evaluations(merged_file)
+        if criterion_id not in merged:
+            return False
+        if self.evaluation_mode != "multi_persona":
+            return True
+        if self.criterion_evaluator.config.get("force_review", False):
+            return False
+        from src.review_workflow.components.evaluators.criterion_evaluator.file_utils import (
+            get_persona_evaluations_file_path,
+        )
+        for persona in self.evaluation_personas:
+            persona_file = get_persona_evaluations_file_path(
+                collection_name,
+                self.pipeline_name,
+                artifact_name,
+                persona["id"],
+                criteria_set_name,
+                self.collections_root,
+            )
+            persona_evaluations = load_existing_evaluations(persona_file)
+            if criterion_id not in persona_evaluations:
+                return False
+        return True
+
+    def _run_criterion_evaluations(self, run_context: Dict[str, Any], criteria: List[Dict[str, Any]]) -> None:
+        if self.criterion_evaluator.config.get("answer_all_together", False):
+            if self.evaluation_mode == "multi_persona":
+                raise ValueError("answer_all_together is not supported with multi_persona evaluation")
+            self.criterion_evaluator.execute({**run_context, "criteria": criteria})
+            return
+
+        collection_name = run_context["collection_name"]
+        artifact_name = run_context["artifact_name"]
+        criteria_set_name = run_context["criteria_set_name"]
+        merged_file = get_evaluations_file_path(
+            collection_name,
+            self.pipeline_name,
+            artifact_name,
+            criteria_set_name,
+            self.collections_root,
+        )
+        merged_evaluations = load_existing_evaluations(merged_file)
+
+        for idx, criterion in enumerate(criteria, 1):
+            if self.stop_event and self.stop_event.is_set():
+                raise InterruptedError("Review process stopped by user")
+
+            criterion_id = criterion.get("id")
+            if self._criterion_already_evaluated(collection_name, artifact_name, criteria_set_name, criterion_id):
+                continue
+
+            if self.evaluation_mode == "multi_persona" and self.evaluation_personas:
+                persona_results: Dict[str, Dict[str, Any]] = {}
+                for persona in self.evaluation_personas:
+                    if self.log_callback:
+                        self.log_callback(
+                            f"Persona {persona['label']} — criterion {idx}/{len(criteria)}",
+                            "info",
+                        )
+                    result = self.criterion_evaluator.execute({
+                        **run_context,
+                        "criterion": criterion,
+                        "persona_id": persona["id"],
+                        "config_override": {"system_prompt": persona.get("system_prompt")},
+                    })
+                    persona_results[persona["id"]] = result
+
+                merged_entry = merge_criterion_results(
+                    persona_results,
+                    self.evaluation_personas,
+                    merge_strategy=self.merge_strategy,
+                )
+                if not self.keep_persona_scores:
+                    merged_entry.pop("persona_scores", None)
+                merged_evaluations[criterion_id] = merged_entry
+                save_evaluations(merged_file, merged_evaluations)
+                continue
+
+            if self.log_callback:
+                self.log_callback(f"Evaluating criterion {idx}/{len(criteria)}", "info")
+            result = self.criterion_evaluator.execute({**run_context, "criterion": criterion})
+            merged_evaluations[criterion_id] = result
+            save_evaluations(merged_file, merged_evaluations)
+
+        self._write_persona_manifest(collection_name, artifact_name, criteria_set_name)
