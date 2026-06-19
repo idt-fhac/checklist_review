@@ -43,11 +43,11 @@ def _normalize_criteria_input(raw_items: List[Any]) -> List[Dict[str, Any]]:
 
 
 def _write_criteria_set_file(path: Path, name: str, criteria: List[Dict[str, Any]], **extra: Any) -> Dict[str, Any]:
-    from src.core.criteria import load_criteria_set
+    from src.core.criteria import load_criteria_set, save_criteria_set_file
 
     payload = {"name": name, "criteria": criteria, **extra}
     criteria_set = load_criteria_set(payload, name=name)
-    path.write_text(json.dumps(criteria_set, indent=2), encoding="utf-8")
+    save_criteria_set_file(path, criteria_set, **extra)
     return criteria_set
 
 
@@ -469,7 +469,7 @@ def simulate_checklist():
         filename = entry.get("filename") or entry.get("artifact_id") or entry.get("title")
         if not filename:
             continue
-        target = checklist_dir / f"{Path(filename).name}.json"
+        target = checklist_dir / f"{Path(filename).stem}.yaml"
         _write_criteria_set_file(
             target,
             Path(filename).stem,
@@ -528,17 +528,19 @@ def api_upload_checklist():
             pdf_path = Path(tmp_file.name)
             file.save(pdf_path)
     else:
-        # JSON file - save directly
-        file_path = checklist_dir / filename
-        file.save(file_path)
+        suffix = Path(filename).suffix.lower()
+        if suffix not in (".yaml", ".yml", ".json"):
+            return jsonify({"error": "Criteria set uploads must be .yaml or .yml files"}), 400
         pdf_path = None
+        uploaded_path = checklist_dir / filename
+        file.save(uploaded_path)
     
     def generate():
         try:
             # Stage 1: Upload complete
             yield _sse_message("stage_start", {
                 "stage": "upload",
-                "stage_name": "Uploading Checklist",
+                "stage_name": "Uploading Criteria Set",
                 "filename": filename
             })
             
@@ -576,9 +578,9 @@ def api_upload_checklist():
                         "filename": filename
                     })
                     
-                    json_path = checklist_dir / f"{file_stem}.json"
+                    yaml_path = checklist_dir / f"{file_stem}.yaml"
                     _write_criteria_set_file(
-                        json_path,
+                        yaml_path,
                         file_stem,
                         criteria,
                         source="extracted_from_pdf",
@@ -615,17 +617,36 @@ def api_upload_checklist():
                         "message": "No LLM provider configured for extraction. Please configure one in settings."
                     })
             else:
-                # Non-PDF file (JSON) - already saved, just complete
+                from src.core.criteria import criteria_set_path, load_criteria_set, save_criteria_set_file
+                import yaml as yaml_lib
+
+                yield _sse_message("progress", {
+                    "stage": "upload",
+                    "progress": 50,
+                    "message": f"Validating {filename}...",
+                    "filename": filename
+                })
+                raw = uploaded_path.read_text(encoding="utf-8")
+                if uploaded_path.suffix.lower() == ".json":
+                    payload = json.loads(raw)
+                else:
+                    payload = yaml_lib.safe_load(raw)
+                criteria_set = load_criteria_set(payload, name=file_stem)
+                dest = criteria_set_path(checklist_dir, file_stem)
+                save_criteria_set_file(dest, criteria_set)
+                if uploaded_path != dest and uploaded_path.exists():
+                    uploaded_path.unlink()
+
                 yield _sse_message("progress", {
                     "stage": "upload",
                     "progress": 100,
-                    "message": f"Saved {filename}",
+                    "message": f"Saved {dest.name}",
                     "filename": filename
                 })
-                
+
                 yield _sse_message("complete", {
-                    "filename": filename,
-                    "message": "File uploaded successfully"
+                    "filename": dest.name,
+                    "message": "Criteria set uploaded successfully"
                 })
         except PDFProcessingError as e:
             logger.error(f"Error extracting checklist questions: {e}")
@@ -658,26 +679,26 @@ def api_upload_checklist():
 @checklist_review_bp.get("/api/criteria-sets/<criteria_set_name>/view")
 def api_view_criteria_set(criteria_set_name):
     """View a criteria set from the active workspace."""
-    from src.core.criteria import load_criteria_set
+    from src.core.criteria import criteria_set_path, find_criteria_set_path, load_criteria_set_file
 
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     from src.core.storage import _criteria_sets_dir
     criteria_dir = _criteria_sets_dir(base_dir)
-    json_file = criteria_dir / f"{criteria_set_name}.json"
+    criteria_file = find_criteria_set_path(criteria_dir, criteria_set_name)
 
-    if not json_file.exists():
+    if criteria_file is None:
         return jsonify({"error": "Criteria set not found"}), 404
 
     try:
-        payload = json.loads(json_file.read_text(encoding="utf-8"))
-        criteria_set = load_criteria_set(payload, name=criteria_set_name)
+        criteria_set = load_criteria_set_file(criteria_file)
         return jsonify({
-            "type": "json",
+            "type": "yaml",
             "name": criteria_set_name,
             "criteria": criteria_set.get("criteria", []),
+            "source": criteria_set.get("source"),
         })
     except Exception as e:
-        logger.error(f"Error reading criteria set JSON: {e}")
+        logger.error(f"Error reading criteria set YAML: {e}")
         return jsonify({"error": f"Failed to read criteria set: {str(e)}"}), 500
 
 
@@ -690,21 +711,23 @@ def api_rename_checklist(criteria_set_name):
     if not new_name:
         return jsonify({"error": "Missing new_name"}), 400
     
+    from src.core.criteria import criteria_set_path, find_criteria_set_path
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     from src.core.storage import _criteria_sets_dir
     checklist_dir = _criteria_sets_dir(base_dir)
-    
-    json_file = checklist_dir / f"{criteria_set_name}.json"
-    new_json_file = checklist_dir / f"{new_name}.json"
-    
-    if not json_file.exists():
+
+    criteria_file = find_criteria_set_path(checklist_dir, criteria_set_name)
+    new_file = criteria_set_path(checklist_dir, new_name)
+
+    if criteria_file is None:
         return jsonify({"error": "Checklist not found"}), 404
-    
-    if new_json_file.exists():
+
+    if new_file.exists():
         return jsonify({"error": "A checklist with this name already exists"}), 400
-    
+
     try:
-        json_file.rename(new_json_file)
+        criteria_file.rename(new_file)
         
         # Rename checklist folders in all collections
         collections_root = get_collections_dir()
@@ -728,17 +751,19 @@ def api_rename_checklist(criteria_set_name):
 @checklist_review_bp.delete("/api/criteria-sets/<criteria_set_name>")
 def api_delete_checklist(criteria_set_name):
     """Delete a checklist from workspaces/guest/checklists (global, not per collection)"""
+    from src.core.criteria import find_criteria_set_path
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     from src.core.storage import _criteria_sets_dir
     checklist_dir = _criteria_sets_dir(base_dir)
-    
-    json_file = checklist_dir / f"{criteria_set_name}.json"
-    
-    if not json_file.exists():
+
+    criteria_file = find_criteria_set_path(checklist_dir, criteria_set_name)
+
+    if criteria_file is None:
         return jsonify({"error": "Checklist not found"}), 404
-    
+
     try:
-        json_file.unlink()
+        criteria_file.unlink()
         
         # Delete checklist folders in all collections
         collections_root = get_collections_dir()
@@ -773,17 +798,19 @@ def api_create_criteria_set():
     if not criteria:
         return jsonify({"error": "At least one criterion is required"}), 400
 
+    from src.core.criteria import criteria_set_path
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     from src.core.storage import _criteria_sets_dir
     criteria_dir = _criteria_sets_dir(base_dir)
     criteria_dir.mkdir(parents=True, exist_ok=True)
 
-    json_file = criteria_dir / f"{criteria_set_name}.json"
-    if json_file.exists():
+    criteria_file = criteria_set_path(criteria_dir, criteria_set_name)
+    if criteria_file.exists():
         return jsonify({"error": "A criteria set with this name already exists"}), 400
 
     try:
-        _write_criteria_set_file(json_file, criteria_set_name, criteria)
+        _write_criteria_set_file(criteria_file, criteria_set_name, criteria)
         return jsonify({"message": "Criteria set created successfully", "name": criteria_set_name})
     except Exception as e:
         logger.error(f"Error creating criteria set: {e}")
@@ -800,22 +827,23 @@ def api_update_criteria_set(criteria_set_name):
     if not criteria:
         return jsonify({"error": "At least one criterion is required"}), 400
 
+    from src.core.criteria import criteria_set_path, find_criteria_set_path, load_criteria_set_file
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     from src.core.storage import _criteria_sets_dir
     criteria_dir = _criteria_sets_dir(base_dir)
-    json_file = criteria_dir / f"{criteria_set_name}.json"
+    criteria_file = find_criteria_set_path(criteria_dir, criteria_set_name)
 
-    if not json_file.exists():
+    if criteria_file is None:
         return jsonify({"error": "Criteria set not found"}), 404
 
     try:
-        existing_raw = json.loads(json_file.read_text(encoding="utf-8"))
+        existing = load_criteria_set_file(criteria_file)
         extra = {}
-        if isinstance(existing_raw, dict):
-            for key in ("source", "generated_at"):
-                if existing_raw.get(key) is not None:
-                    extra[key] = existing_raw[key]
-        _write_criteria_set_file(json_file, criteria_set_name, criteria, **extra)
+        for key in ("source", "generated_at"):
+            if existing.get(key) is not None:
+                extra[key] = existing[key]
+        _write_criteria_set_file(criteria_file, criteria_set_name, criteria, **extra)
         return jsonify({"message": "Criteria set updated successfully", "name": criteria_set_name})
     except Exception as e:
         logger.error(f"Error updating criteria set: {e}")
@@ -825,15 +853,14 @@ def api_update_criteria_set(criteria_set_name):
 @checklist_review_bp.post("/api/criteria-sets/<criteria_set_name>/criteria")
 def api_get_criteria_set_criteria(criteria_set_name):
     """Return criteria from a criteria set JSON file."""
-    from src.core.criteria import criteria_for_evaluator, load_criteria_set
+    from src.core.criteria import criteria_for_evaluator, criteria_set_path, find_criteria_set_path, load_criteria_set_file
     from src.core.storage import _criteria_sets_dir
 
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    criteria_path = _criteria_sets_dir(base_dir) / f"{criteria_set_name}.json"
-    if not criteria_path.exists():
+    criteria_path = find_criteria_set_path(_criteria_sets_dir(base_dir), criteria_set_name)
+    if criteria_path is None:
         return jsonify({"error": f"Criteria set '{criteria_set_name}' not found"}), 404
-    payload = json.loads(criteria_path.read_text(encoding="utf-8"))
-    criteria_set = load_criteria_set(payload, name=criteria_set_name)
+    criteria_set = load_criteria_set_file(criteria_path)
     criteria = criteria_for_evaluator(criteria_set)
     return jsonify({"criteria": criteria, "count": len(criteria)})
 

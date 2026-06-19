@@ -2,6 +2,7 @@ import subprocess
 import re
 from pathlib import Path
 from typing import List, Optional
+from src.core.criteria import criteria_set_stem
 
 from src.review_workflow.engine.base import BaseComponent
 from src.review_workflow.engine.utils import load_model_from_provider
@@ -95,9 +96,7 @@ class GithubChecker(BaseComponent):
                 project_root = get_project_root()
                 base_dir = project_root / "workspaces" / "guest" / "collections"
                 
-            checklist_name_clean = checklist_name
-            if checklist_name_clean.endswith(".json"):
-                checklist_name_clean = checklist_name_clean[:-5]
+            checklist_name_clean = criteria_set_stem(checklist_name)
             return (
                 base_dir
                 / slug(collection_name)

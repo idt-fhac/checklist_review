@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from src.core.criteria import criteria_set_stem
 
 from src.core.embedding import Embedding
 
@@ -320,9 +321,7 @@ def get_vector_db_path(
     
     # If criteria_set_name is provided, add it to the path
     if criteria_set_name:
-        criteria_set_name_clean = criteria_set_name
-        if criteria_set_name_clean.endswith('.json'):
-            criteria_set_name_clean = criteria_set_name_clean[:-5]
+        criteria_set_name_clean = criteria_set_stem(criteria_set_name)
         paper_dir = paper_dir / _slug(criteria_set_name_clean)
     
     paper_dir = paper_dir / artifact_name

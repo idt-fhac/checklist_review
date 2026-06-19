@@ -6,7 +6,7 @@ stages:
       force_execution: false
   - criteria_extractor:
       source: rfp
-      output: criteria.json
+      output: criteria.yaml
       provider: primary_llm
   - section_mapper:
       strategy: heading_match

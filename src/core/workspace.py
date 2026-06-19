@@ -6,6 +6,8 @@ from pathlib import Path
 
 from flask import session, has_request_context
 
+from src.core.config_loader import seed_workspace_criteria_sets
+
 DEFAULTS_WORKSPACE_NAME = "defaults"
 
 
@@ -70,25 +72,34 @@ def get_config_dir(workspace_name: str = None) -> Path:
     return d
 
 
-def _copy_json_files_if_missing(src: Path, dest: Path) -> None:
+def _copy_yaml_files_if_missing(src: Path, dest: Path) -> None:
     if not src.is_dir():
         return
     dest.mkdir(parents=True, exist_ok=True)
-    for f in src.glob("*.json"):
+    for f in src.glob("*.yaml"):
         out = dest / f.name
         if not out.exists():
             shutil.copy2(f, out)
 
 
 def _ensure_minimal_settings(cfg_dest: Path) -> None:
-    settings_path = cfg_dest / "settings.json"
+    settings_path = cfg_dest / "settings.yaml"
     if settings_path.is_file():
         return
-    minimal = {
-        "default_page": "checklist_review",
-        "show_canvas_by_default": False,
-    }
-    settings_path.write_text(json.dumps(minimal, indent=2) + "\n", encoding="utf-8")
+    template = get_defaults_workspace_dir() / "config" / "settings.yaml"
+    if template.is_file():
+        shutil.copy2(template, settings_path)
+        return
+    from src.core.config_loader import save_yaml
+
+    save_yaml(
+        settings_path,
+        {
+            "schema_version": 1,
+            "default_page": "checklist_review",
+            "show_canvas_by_default": False,
+        },
+    )
 
 
 def _seed_new_workspace(name: str, *, merge_missing_only: bool = False) -> None:
@@ -97,8 +108,9 @@ def _seed_new_workspace(name: str, *, merge_missing_only: bool = False) -> None:
     if defaults_root.is_dir():
         tmpl_cfg = defaults_root / "config"
         if tmpl_cfg.is_dir():
-            _copy_json_files_if_missing(tmpl_cfg, cfg_dest)
-        _copy_json_files_if_missing(defaults_root / "criteria_sets", get_criteria_sets_dir(name))
+            _copy_yaml_files_if_missing(tmpl_cfg, cfg_dest)
+    seed_workspace_criteria_sets(get_criteria_sets_dir(name))
+    _copy_yaml_files_if_missing(defaults_root / "criteria_sets", get_criteria_sets_dir(name))
     _ensure_minimal_settings(cfg_dest)
 
 
@@ -132,9 +144,10 @@ def duplicate_workspace(source_name: str, new_name: str) -> bool:
     get_config_dir(new_name)
     cfg_src = get_config_dir(source_name)
     cfg_dest = get_config_dir(new_name)
-    for f in cfg_src.glob("*.json"):
+    for f in cfg_src.glob("*.yaml"):
         shutil.copy2(f, cfg_dest / f.name)
-    _copy_json_files_if_missing(get_criteria_sets_dir(source_name), get_criteria_sets_dir(new_name))
+    seed_workspace_criteria_sets(get_criteria_sets_dir(new_name))
+    _copy_yaml_files_if_missing(get_criteria_sets_dir(source_name), get_criteria_sets_dir(new_name))
     return True
 
 
@@ -148,4 +161,3 @@ def delete_workspace(name: str) -> bool:
     if has_request_context() and session.get("workspace") == name:
         session["workspace"] = "guest"
     return True
-

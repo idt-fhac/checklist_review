@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+
+from src.core.criteria import criteria_set_stem
 from typing import Dict, Any
 
 from src.review_workflow.components.evaluators.criterion_evaluator.helpers import get_project_root, slug
@@ -16,7 +18,7 @@ def get_artifact_file_paths(
         collections_root = get_project_root() / "workspaces" / "guest" / "collections"
     artifact_dir = Path(collections_root) / slug(collection_name) / "review_runs" / slug(pipeline_name)
     if criteria_set_name:
-        criteria_clean = criteria_set_name.removesuffix(".json")
+        criteria_clean = criteria_set_stem(criteria_set_name)
         artifact_dir = artifact_dir / slug(criteria_clean)
     artifact_dir = artifact_dir / artifact_name
     return artifact_dir / "artifact_content.json", artifact_dir / "artifact_content.md"
@@ -33,7 +35,7 @@ def get_evaluations_file_path(
         collections_root = get_project_root() / "workspaces" / "guest" / "collections"
     artifact_dir = Path(collections_root) / slug(collection_name) / "review_runs" / slug(pipeline_name)
     if criteria_set_name:
-        criteria_clean = criteria_set_name.removesuffix(".json")
+        criteria_clean = criteria_set_stem(criteria_set_name)
         artifact_dir = artifact_dir / slug(criteria_clean)
     artifact_dir = artifact_dir / artifact_name
     artifact_dir.mkdir(parents=True, exist_ok=True)

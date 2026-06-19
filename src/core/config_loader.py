@@ -21,6 +21,31 @@ def get_repo_root() -> Path:
     return _REPO_ROOT
 
 
+def get_config_criteria_sets_dir() -> Path:
+    return _CONFIG_DIR / "criteria_sets"
+
+
+def save_yaml(path: Path, data: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(data, sort_keys=False, allow_unicode=True, default_flow_style=False),
+        encoding="utf-8",
+    )
+
+
+def seed_workspace_criteria_sets(dest: Path) -> None:
+    """Copy repo criteria set templates into a workspace (missing files only)."""
+    dest.mkdir(parents=True, exist_ok=True)
+    defaults_criteria = _REPO_ROOT / "workspaces" / "defaults" / "criteria_sets"
+    for src_dir in (get_config_criteria_sets_dir(), defaults_criteria):
+        if not src_dir.is_dir():
+            continue
+        for src in sorted(src_dir.glob("*.yaml")):
+            out = dest / src.name
+            if not out.exists():
+                out.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def _load_yaml(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}

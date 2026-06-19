@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List
 
-from src.core.criteria import criteria_for_evaluator, load_criteria_set
+from src.core.criteria import criteria_for_evaluator, criteria_set_stem, find_criteria_set_path, load_criteria_set_file
 from src.review_workflow.components.pre_process.document_loader.component import DocumentLoader
 from src.review_workflow.components.evaluators.criterion_evaluator.component import CriterionEvaluator
 from src.review_workflow.components.post_process.md_writer.component import MdWriter
@@ -62,7 +62,7 @@ class ReviewProcess:
             / "review_runs"
             / self._slug(self.pipeline_name)
         )
-        criteria_clean = criteria_set_name.removesuffix(".json")
+        criteria_clean = criteria_set_stem(criteria_set_name)
         artifact_dir = artifact_dir / self._slug(criteria_clean) / artifact_name
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "token_usage.json").write_text(json.dumps(token_usage, indent=2), encoding="utf-8")
@@ -99,12 +99,11 @@ class ReviewProcess:
                 self.log_callback(f"{'='*15}\n\n{artifact_title}", "info")
 
         criteria_dir = self.collections_root.parent / "criteria_sets"
-        criteria_clean = criteria_set_name.removesuffix(".json")
-        criteria_path = criteria_dir / f"{criteria_clean}.json"
-        if not criteria_path.exists():
+        criteria_path = find_criteria_set_path(criteria_dir, criteria_set_name)
+        if criteria_path is None:
             raise FileNotFoundError(f"Criteria set '{criteria_set_name}' not found in {criteria_dir}")
 
-        criteria_set = load_criteria_set(json.loads(criteria_path.read_text(encoding="utf-8")), name=criteria_clean)
+        criteria_set = load_criteria_set_file(criteria_path)
         criteria = criteria_for_evaluator(criteria_set)
         if not criteria:
             raise ValueError(f"No criteria in criteria set '{criteria_set_name}'")

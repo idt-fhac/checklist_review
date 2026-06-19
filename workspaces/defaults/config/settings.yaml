@@ -1,0 +1,7 @@
+schema_version: 1
+embedding_model_type: provider
+default_page: checklist_review
+pdf_metadata_extraction_method: llm
+show_canvas_by_default: false
+pdf_processing_llm_provider_id: null
+checklist_extraction_llm_provider_id: null

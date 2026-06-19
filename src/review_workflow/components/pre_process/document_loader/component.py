@@ -1,6 +1,8 @@
 import json
 import shutil
 from pathlib import Path
+
+from src.core.criteria import criteria_set_stem
 from typing import Dict, Any, Optional
 
 from src.review_workflow.engine.base import BaseComponent
@@ -28,7 +30,7 @@ class DocumentLoader(BaseComponent):
 
         run_dir = col_dir / "review_runs" / _slug(pipeline_name)
         if criteria_set_name:
-            criteria_clean = criteria_set_name.removesuffix(".json")
+            criteria_clean = criteria_set_stem(criteria_set_name)
             run_dir = run_dir / _slug(criteria_clean)
 
         artifact_out_dir = run_dir / artifact_name

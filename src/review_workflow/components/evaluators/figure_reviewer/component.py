@@ -1,3 +1,4 @@
+from src.core.criteria import criteria_set_stem
 """
 Figure Reviewer: answers a question about figures by loading page images
 and querying a multimodal agent for each page.
@@ -87,9 +88,7 @@ class FigureReviewer(BaseComponent):
             root = get_project_root()
             collections_root = root / "workspaces" / "guest" / "collections"
             
-        checklist_clean = checklist_name
-        if checklist_clean.endswith(".json"):
-            checklist_clean = checklist_clean[:-5]
+        checklist_clean = criteria_set_stem(checklist_name)
         return (
             Path(collections_root)
             / slug(collection_name)

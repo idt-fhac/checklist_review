@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List
+from src.core.criteria import criteria_set_stem
 
 from src.review_workflow.engine.base import BaseComponent
 
@@ -28,7 +29,7 @@ class PdfWriter(BaseComponent):
         paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
 
         if criteria_set_name:
-            criteria_set_name_clean = criteria_set_name.rstrip(".json") if criteria_set_name.endswith(".json") else criteria_set_name
+            criteria_set_name_clean = criteria_set_stem(criteria_set_name)
             paper_output_dir = paper_output_dir / _slug(criteria_set_name_clean)
 
         paper_output_dir = paper_output_dir / artifact_name

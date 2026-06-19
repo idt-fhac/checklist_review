@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import shutil
 from datetime import datetime
+
+from src.core.criteria import criteria_set_stem
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -294,7 +296,7 @@ def save_checklist(collections_root: Path, collection_name: str, checklist: List
     timestamp = datetime.utcnow().strftime(ISO_FORMAT)
     # Get base directory (project root)
     base_dir = Path(__file__).resolve().parent.parent.parent
-    path = _criteria_sets_dir(base_dir) / f"{timestamp}.json"
+    path = _criteria_sets_dir(base_dir) / f"{timestamp}.yaml"
     with path.open("w", encoding="utf-8") as fp:
         json.dump(checklist, fp, indent=2)
     return path
@@ -309,12 +311,12 @@ def list_criteria_sets(base_dir: Path) -> List[Dict[str, Any]]:
         return items
     
     # Only list JSON files (no PDF support)
-    for json_file in sorted(criteria_set_dir.glob("*.json")):
-        stem = json_file.stem
+    for yaml_file in sorted(criteria_set_dir.glob("*.yaml")):
+        stem = yaml_file.stem
         items.append({
             "name": stem,
-            "path": str(json_file),
-            "created_at": datetime.fromtimestamp(json_file.stat().st_mtime),
+            "path": str(yaml_file),
+            "created_at": datetime.fromtimestamp(yaml_file.stat().st_mtime),
         })
     
     return items
@@ -810,9 +812,7 @@ def list_evaluations(collections_root: Path, collection_name: str, pipeline_id: 
     
     # If criteria_set_name is provided, look in checklist subdirectory
     if criteria_set_name:
-        criteria_set_name_clean = criteria_set_name
-        if criteria_set_name_clean.endswith('.json'):
-            criteria_set_name_clean = criteria_set_name_clean[:-5]
+        criteria_set_name_clean = criteria_set_stem(criteria_set_name)
         criteria_set_dir = proc_dir / _slug(criteria_set_name_clean)
         if not criteria_set_dir.exists():
             criteria_set_dir = proc_dir / criteria_set_name_clean
@@ -855,7 +855,7 @@ def get_review_paper_dir(
     if not base_path.exists():
         return None
     if criteria_set_name:
-        criteria_set_name_clean = criteria_set_name.rstrip(".json") if criteria_set_name.endswith(".json") else criteria_set_name
+        criteria_set_name_clean = criteria_set_stem(criteria_set_name)
         check_dir = base_path / _slug(criteria_set_name_clean)
         if not check_dir.exists():
             check_dir = base_path / criteria_set_name_clean
@@ -922,8 +922,7 @@ def load_evaluation(collections_root: Path, collection_name: str, artifact_id: s
         # If criteria_set_name is provided, add it to the path
         if criteria_set_name:
             criteria_set_name_clean = criteria_set_name
-            if criteria_set_name_clean.endswith('.json'):
-                criteria_set_name_clean = criteria_set_name_clean[:-5]
+
             base_path = base_path / _slug(criteria_set_name_clean)
             if not base_path.exists():
                 base_path = base_path.parent / criteria_set_name_clean
@@ -960,8 +959,7 @@ def delete_evaluation(collections_root: Path, collection_name: str, artifact_id:
         # If criteria_set_name is provided, add it to the path
         if criteria_set_name:
             criteria_set_name_clean = criteria_set_name
-            if criteria_set_name_clean.endswith('.json'):
-                criteria_set_name_clean = criteria_set_name_clean[:-5]
+
             base_path = base_path / _slug(criteria_set_name_clean)
             if not base_path.exists():
                 base_path = base_path.parent / criteria_set_name_clean
@@ -1173,9 +1171,7 @@ def process_result_exists(collections_root: Path, collection_name: str, pipeline
     
     # If criteria_set_name is provided, add it to the path
     if criteria_set_name:
-        criteria_set_name_clean = criteria_set_name
-        if criteria_set_name_clean.endswith('.json'):
-            criteria_set_name_clean = criteria_set_name_clean[:-5]
+        criteria_set_name_clean = criteria_set_stem(criteria_set_name)
         base_path = base_path / _slug(criteria_set_name_clean)
         if not base_path.exists():
             base_path = base_path.parent / criteria_set_name_clean
