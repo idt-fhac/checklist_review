@@ -1,0 +1,67 @@
+{
+  "id": "criterion_evaluator",
+  "name": "Criterion Evaluator",
+  "type": "review",
+  "description": "Evaluates criteria against artifact content using an LLM.",
+  "inputs": [
+    {"name": "collection_name", "type": "string"},
+    {"name": "pipeline_name", "type": "string"},
+    {"name": "artifact_name", "type": "string"},
+    {"name": "criteria_set_name", "type": "string"},
+    {"name": "criterion", "type": "object", "description": "Single criterion with id and description"},
+    {"name": "criteria", "type": "array", "description": "Batch criteria to evaluate together"}
+  ],
+  "outputs": [
+    {"name": "evaluation_result", "type": "object"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "provider_id": {
+        "type": "string",
+        "label": "LLM Provider"
+      },
+      "system_prompt": {
+        "type": "string",
+        "default": "You are a rigorous reviewer.",
+        "label": "System Prompt"
+      },
+      "force_review": {
+        "type": "boolean",
+        "default": false,
+        "label": "Force Re-Review"
+      },
+      "answer_all_together": {
+        "type": "boolean",
+        "default": false,
+        "label": "Evaluate All Criteria Together"
+      },
+      "use_rag": {
+        "type": "boolean",
+        "default": false,
+        "label": "Use RAG",
+        "ui:if": {"answer_all_together": {"$ne": true}}
+      },
+      "rag_chunking_strategy": {
+        "type": "string",
+        "default": "page",
+        "enum": ["page", "paragraph"],
+        "label": "RAG Strategy",
+        "ui:if": {"use_rag": true, "answer_all_together": {"$ne": true}}
+      },
+      "rag_top_k": {
+        "type": "integer",
+        "default": 5,
+        "minimum": 1,
+        "label": "Number of Chunks",
+        "ui:if": {"use_rag": true, "answer_all_together": {"$ne": true}}
+      },
+      "rag_embedding_provider_id": {
+        "type": "string",
+        "label": "Embedding Provider",
+        "ui:if": {"use_rag": true, "answer_all_together": {"$ne": true}}
+      }
+    },
+    "required": ["provider_id"]
+  }
+}

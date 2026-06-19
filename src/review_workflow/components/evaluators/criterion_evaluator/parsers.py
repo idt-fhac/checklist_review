@@ -2,8 +2,8 @@ import json
 import re
 from typing import Dict, Any, List, Optional
 
-from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
-from src.review_workflow.components.evaluators.question_reviewer.models import ReviewResponse, BatchReviewResponse
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
+from src.review_workflow.components.evaluators.criterion_evaluator.models import ReviewResponse, BatchReviewResponse
 from src.review_workflow.engine.token_usage import add as token_usage_add
 
 
@@ -196,7 +196,7 @@ def parse_batch_json_from_text(response_text: str, questions: List[Dict[str, Any
                 for answer in answers:
                     if isinstance(answer, dict):
                         result_list.append({
-                            "question_id": str(answer.get("question_id", "")),
+                            "criterion_id": str(answer.get("criterion_id", "")),
                             "answer": bool(answer.get("answer", False)),
                             "supporting_texts": answer.get("supporting_texts", [])
                         })
@@ -206,7 +206,7 @@ def parse_batch_json_from_text(response_text: str, questions: List[Dict[str, Any
     
     json_patterns = [
         r'\{"answers"\s*:\s*\[.*?\]\}',
-        r'\[.*?"question_id".*?\]',
+        r'\[.*?"criterion_id".*?\]',
     ]
     
     for pattern in json_patterns:
@@ -222,7 +222,7 @@ def parse_batch_json_from_text(response_text: str, questions: List[Dict[str, Any
                         for answer in answers:
                             if isinstance(answer, dict):
                                 result_list.append({
-                                    "question_id": str(answer.get("question_id", "")),
+                                    "criterion_id": str(answer.get("criterion_id", "")),
                                     "answer": bool(answer.get("answer", False)),
                                     "supporting_texts": answer.get("supporting_texts", [])
                                 })
@@ -235,16 +235,16 @@ def parse_batch_json_from_text(response_text: str, questions: List[Dict[str, Any
 
 def extract_batch_from_text_fallback(response_text: str, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     result_list = []
-    question_ids = {q.get("id"): q for q in questions}
+    criterion_ids = {q.get("id"): q for q in questions}
     
-    for question_id, question_data in question_ids.items():
-        question_text = question_data.get("text", "")
+    for criterion_id, criterion_data in criterion_ids.items():
+        criterion_text = criterion_data.get("text", "")
         
         answer = False
         answer_patterns = [
-            rf'question.*?{re.escape(question_id)}.*?(?:answer|result)[\s:]+(true|yes|correct)',
-            rf'{re.escape(question_id)}.*?(?:answer|result)[\s:]+(true|yes|correct)',
-            rf'question.*?{re.escape(question_text[:50])}.*?(?:answer|result)[\s:]+(true|yes|correct)',
+            rf'question.*?{re.escape(criterion_id)}.*?(?:answer|result)[\s:]+(true|yes|correct)',
+            rf'{re.escape(criterion_id)}.*?(?:answer|result)[\s:]+(true|yes|correct)',
+            rf'question.*?{re.escape(criterion_text[:50])}.*?(?:answer|result)[\s:]+(true|yes|correct)',
         ]
         
         for pattern in answer_patterns:
@@ -252,7 +252,7 @@ def extract_batch_from_text_fallback(response_text: str, questions: List[Dict[st
                 answer = True
                 break
         
-        if re.search(rf'{re.escape(question_id)}.*?(?:answer|result)[\s:]+(false|no|incorrect)', response_text, re.IGNORECASE):
+        if re.search(rf'{re.escape(criterion_id)}.*?(?:answer|result)[\s:]+(false|no|incorrect)', response_text, re.IGNORECASE):
             answer = False
         
         supporting_texts = []
@@ -273,7 +273,7 @@ def extract_batch_from_text_fallback(response_text: str, questions: List[Dict[st
             supporting_texts = [{"page_number": -1, "text_crop": response_text[:500], "short_explanation": "Extracted from batch response"}]
         
         result_list.append({
-            "question_id": question_id,
+            "criterion_id": criterion_id,
             "answer": answer,
             "supporting_texts": supporting_texts[:3]
         })
@@ -284,7 +284,7 @@ def extract_batch_from_text_fallback(response_text: str, questions: List[Dict[st
 def extract_batch_from_text_only(agent, prompt: str, provider_config: Dict[str, Any],
                                  questions: List[Dict[str, Any]],
                                  token_usage_accumulator: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-    simple_prompt = prompt + "\n\nPlease provide answers for all questions listed above. For each question, provide the question_id, answer (True/False), and cite supporting text with page numbers."
+    simple_prompt = prompt + "\n\nPlease provide answers for all questions listed above. For each question, provide the criterion_id, answer (True/False), and cite supporting text with page numbers."
     simple_prompt = clean_text_for_encoding(simple_prompt)
     response = agent(simple_prompt)
     if token_usage_accumulator is not None:
@@ -299,7 +299,7 @@ def fallback_batch_structured_output(agent, prompt: str, provider_config: Dict[s
     example_answers = []
     for q in questions:
         example_answers.append({
-            "question_id": q.get("id", ""),
+            "criterion_id": q.get("id", ""),
             "answer": True,
             "supporting_texts": [{"page_number": 1, "text_crop": "example text", "short_explanation": "example"}]
         })

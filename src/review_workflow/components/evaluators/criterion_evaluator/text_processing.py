@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, List, Optional
 
-from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
 
 
 def extract_pages_from_markdown(md_content: str) -> List[Dict[str, Any]]:
@@ -19,9 +19,9 @@ def extract_pages_from_markdown(md_content: str) -> List[Dict[str, Any]]:
 
 def enhance_supporting_texts_with_highlighting(
     supporting_texts_list: List[Dict[str, Any]], 
-    paper_pages: Optional[List[Dict[str, Any]]]
+    artifact_pages: Optional[List[Dict[str, Any]]]
 ) -> List[Dict[str, Any]]:
-    page_lookup = {page.get("page_number"): page.get("text", "") for page in paper_pages} if paper_pages else {}
+    page_lookup = {page.get("page_number"): page.get("text", "") for page in artifact_pages} if artifact_pages else {}
     enhanced_supporting_texts = []
     
     for st in supporting_texts_list:

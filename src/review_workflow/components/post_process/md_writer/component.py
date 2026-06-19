@@ -14,41 +14,41 @@ def _esc(s: str) -> str:
 class MdWriter(BaseComponent):
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         collection_name = inputs.get("collection_name")
-        review_process_name = inputs.get("review_process_name")
-        paper_name = inputs.get("paper_name")
-        checklist_name = inputs.get("checklist_name")
+        pipeline_name = inputs.get("pipeline_name")
+        artifact_name = inputs.get("artifact_name")
+        criteria_set_name = inputs.get("criteria_set_name")
 
-        if not all([collection_name, review_process_name, paper_name]):
-            raise ValueError("Missing required inputs: collection_name, review_process_name, or paper_name")
+        if not all([collection_name, pipeline_name, artifact_name]):
+            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
             project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
-        paper_output_dir = collection_dir / "review_processes" / _slug(review_process_name)
+        paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
 
-        if checklist_name:
-            checklist_name_clean = checklist_name.rstrip(".json") if checklist_name.endswith(".json") else checklist_name
-            paper_output_dir = paper_output_dir / _slug(checklist_name_clean)
+        if criteria_set_name:
+            criteria_set_name_clean = criteria_set_name.rstrip(".json") if criteria_set_name.endswith(".json") else criteria_set_name
+            paper_output_dir = paper_output_dir / _slug(criteria_set_name_clean)
 
-        paper_output_dir = paper_output_dir / paper_name
-        answers_file = paper_output_dir / "answers.json"
+        paper_output_dir = paper_output_dir / artifact_name
+        evaluations_file = paper_output_dir / "evaluations.json"
 
-        if not answers_file.exists():
-            return {"status": "skipped", "reason": "No answers.json found"}
+        if not evaluations_file.exists():
+            return {"status": "skipped", "reason": "No evaluations.json found"}
 
-        with open(answers_file, "r", encoding="utf-8") as f:
-            answers = json.load(f)
+        with open(evaluations_file, "r", encoding="utf-8") as f:
+            evaluations = json.load(f)
 
-        if isinstance(answers, dict):
-            answers = list(answers.values())
+        if isinstance(evaluations, dict):
+            evaluations = list(evaluations.values())
 
         save_details = self.config.get("save_details", False)
         md_content = self._generate_markdown(
-            paper_name, answers,
-            review_process_name=review_process_name or "",
-            checklist_name=checklist_name or "",
+            artifact_name, evaluations,
+            pipeline_name=pipeline_name or "",
+            criteria_set_name=criteria_set_name or "",
             save_details=save_details,
         )
 
@@ -67,33 +67,33 @@ class MdWriter(BaseComponent):
 
     def _generate_markdown(
         self,
-        paper_name: str,
-        answers: List[Dict[str, Any]],
-        review_process_name: str = "",
-        checklist_name: str = "",
+        artifact_name: str,
+        evaluations: List[Dict[str, Any]],
+        pipeline_name: str = "",
+        criteria_set_name: str = "",
         save_details: bool = False,
     ) -> str:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        md = f"# Review Report: {paper_name}\n\n"
-        if review_process_name:
-            md += f"**Review Process:** {review_process_name}\n\n"
-        if checklist_name:
-            md += f"**Checklist:** {checklist_name}\n\n"
+        md = f"# Review Report: {artifact_name}\n\n"
+        if pipeline_name:
+            md += f"**Review Process:** {pipeline_name}\n\n"
+        if criteria_set_name:
+            md += f"**Checklist:** {criteria_set_name}\n\n"
         md += f"**Generated on:** {timestamp}\n\n---\n\n"
         md += "## Detailed Review\n\n"
 
         if not save_details:
             md += "| Question | Answer |\n"
             md += "| :--- | :---: |\n"
-            for item in answers:
-                q = _esc(item.get("question_text", "N/A"))
+            for item in evaluations:
+                q = _esc(item.get("criterion_text", "N/A"))
                 ans = "Yes" if item.get("answer") in (True, "yes", "true", "Yes", "True") else "No"
                 md += f"| {q} | **{ans}** |\n"
             md += "\n"
             return md
 
-        for item in answers:
-            q = _esc(item.get("question_text", "N/A"))
+        for item in evaluations:
+            q = _esc(item.get("criterion_text", "N/A"))
             ans = "Yes" if item.get("answer") in (True, "yes", "true", "Yes", "True") else "No"
             md += f"### {q}\n\n"
             md += f"**Answer:** **{ans}**\n\n"

@@ -5,163 +5,167 @@ from pathlib import Path
 from src.review_workflow.engine.base import BaseComponent
 from src.core.providers import get_provider, resolve_provider_config
 
-from src.review_workflow.components.evaluators.question_reviewer.models import ReviewResponse, BatchReviewResponse
-from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
-from src.review_workflow.components.evaluators.question_reviewer.file_utils import (
-    get_paper_file_paths,
-    get_answer_file_path,
-    load_existing_answers,
-    save_answers
+from src.review_workflow.components.evaluators.criterion_evaluator.models import ReviewResponse, BatchReviewResponse
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
+from src.review_workflow.components.evaluators.criterion_evaluator.file_utils import (
+    get_artifact_file_paths,
+    get_evaluations_file_path,
+    load_existing_evaluations,
+    save_evaluations,
 )
-from src.review_workflow.components.evaluators.question_reviewer.text_processing import (
+from src.review_workflow.components.evaluators.criterion_evaluator.text_processing import (
     extract_pages_from_markdown,
     enhance_supporting_texts_with_highlighting
 )
-from src.review_workflow.components.evaluators.question_reviewer.rag_context import prepare_rag_context
-from src.review_workflow.components.evaluators.question_reviewer.prompt_builder import (
+from src.review_workflow.components.evaluators.criterion_evaluator.rag_context import prepare_rag_context
+from src.review_workflow.components.evaluators.criterion_evaluator.prompt_builder import (
     build_prompt_with_pages,
     build_batch_prompt
 )
-from src.review_workflow.components.evaluators.question_reviewer.parsers import (
+from src.review_workflow.components.evaluators.criterion_evaluator.parsers import (
     extract_response_text,
     fallback_structured_output,
     fallback_batch_structured_output,
     extract_from_text_only,
     extract_batch_from_text_only
 )
-from src.review_workflow.components.evaluators.question_reviewer.agent_creator import create_review_agent
+from src.review_workflow.components.evaluators.criterion_evaluator.agent_creator import create_review_agent
 from src.review_workflow.engine.token_usage import add as token_usage_add
 
-class QuestionReviewer(BaseComponent):
+class CriterionEvaluator(BaseComponent):
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        collection_name = inputs.get("collection_name")
-        review_process_name = inputs.get("review_process_name")
-        paper_name = inputs.get("paper_name")
-        checklist_name = inputs.get("checklist_name")
-        question_data = inputs.get("question")
-        questions_data = inputs.get("questions")
+        collection_name = inputs["collection_name"]
+        pipeline_name = inputs["pipeline_name"]
+        artifact_name = inputs["artifact_name"]
+        criteria_set_name = inputs["criteria_set_name"]
+        criterion = inputs.get("criterion")
+        criteria = inputs.get("criteria")
         log_callback = inputs.get("log_callback")
-        
         token_usage_accumulator = inputs.get("token_usage_accumulator")
         collections_root = inputs.get("collections_root")
-        if questions_data and isinstance(questions_data, list):
-            return self._execute_batch(collection_name, review_process_name, paper_name, checklist_name, questions_data, log_callback, token_usage_accumulator, collections_root)
-        
-        if not question_data:
-            return self._log_error("Either 'question' or 'questions' must be provided", log_callback)
-        
-        return self._execute_single(collection_name, review_process_name, paper_name, checklist_name, question_data, log_callback, token_usage_accumulator, collections_root)
+
+        if criteria and isinstance(criteria, list):
+            return self._execute_batch(
+                collection_name, pipeline_name, artifact_name, criteria_set_name,
+                criteria, log_callback, token_usage_accumulator, collections_root,
+            )
+        if not criterion:
+            return self._log_error("'criterion' or 'criteria' is required", log_callback)
+        return self._execute_single(
+            collection_name, pipeline_name, artifact_name, criteria_set_name,
+            criterion, log_callback, token_usage_accumulator, collections_root,
+        )
     
-    def _execute_single(self, collection_name: str, review_process_name: str, paper_name: str,
-                        checklist_name: str, question_data: Dict[str, Any], log_callback,
+    def _execute_single(self, collection_name: str, pipeline_name: str, artifact_name: str,
+                        criteria_set_name: str, criterion: Dict[str, Any], log_callback,
                         token_usage_accumulator: Optional[Dict[str, Any]] = None,
                         collections_root: Optional[Path] = None) -> Dict[str, Any]:
-        answers_file = get_answer_file_path(collection_name, review_process_name, paper_name, checklist_name, collections_root)
-        existing_answers = load_existing_answers(answers_file)
+        evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
+        existing = load_existing_evaluations(evaluations_file)
 
-        question_id = question_data.get("id")
-        if question_id in existing_answers and not self.config.get("force_review", False):
-            return existing_answers[question_id]
+        criterion_id = criterion.get("id")
+        if criterion_id in existing and not self.config.get("force_review", False):
+            return existing[criterion_id]
 
-        paper_json_path, paper_md_path = get_paper_file_paths(collection_name, review_process_name, paper_name, checklist_name, collections_root)
+        artifact_json_path, artifact_md_path = get_artifact_file_paths(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
         
-        if not paper_json_path.exists():
-            return self._log_error(f"Paper metadata JSON not found: {paper_json_path}", log_callback)
+        if not artifact_json_path.exists():
+            return self._log_error(f"Paper metadata JSON not found: {artifact_json_path}", log_callback)
         
-        with open(paper_json_path, "r", encoding="utf-8") as f:
-            paper_metadata = json.load(f)
+        with open(artifact_json_path, "r", encoding="utf-8") as f:
+            artifact_metadata = json.load(f)
         
-        method = paper_metadata.get("method", "")
+        method = artifact_metadata.get("method", "")
         if method == "Direct File Upload":
             return self._log_error("Direct File Upload method is not yet implemented. Please reprocess the paper with 'Extracted Content' method.", log_callback)
         
-        if not paper_md_path.exists():
+        if not artifact_md_path.exists():
             return self._log_error(f"Paper markdown file not found. Method was: '{method}'. Please reprocess the paper with 'Extracted Content' method.", log_callback)
         
-        md_content = paper_md_path.read_text(encoding="utf-8")
+        md_content = artifact_md_path.read_text(encoding="utf-8")
         if not md_content.strip():
             return self._log_error(f"Paper content is empty. Method: {method}", log_callback)
         
         md_content = clean_text_for_encoding(md_content)
-        paper_pages = extract_pages_from_markdown(md_content)
-        question_text = clean_text_for_encoding(question_data.get('text', ''))
+        artifact_pages = extract_pages_from_markdown(md_content)
+        criterion_text = clean_text_for_encoding(criterion.get('description', ''))
         
         context_content, context_pages = prepare_rag_context(
-            md_content, paper_pages, question_text, collection_name, 
-            review_process_name, paper_name, checklist_name, self.config, log_callback, collections_root
+            md_content, artifact_pages, criterion_text, collection_name, 
+            pipeline_name, artifact_name, criteria_set_name, self.config, log_callback, collections_root
         )
         if isinstance(context_content, str):
             context_content = clean_text_for_encoding(context_content)
         
         provider_config = self._get_provider_config(self.config.get("provider_id"))
-        prompt = build_prompt_with_pages(question_text, context_content, context_pages)
+        prompt = build_prompt_with_pages(criterion_text, context_content, context_pages)
         prompt = clean_text_for_encoding(prompt)
         context = {
             "collection_name": collection_name,
-            "review_process_name": review_process_name,
-            "checklist_name": checklist_name,
-            "paper_name": paper_name,
+            "pipeline_name": pipeline_name,
+            "criteria_set_name": criteria_set_name,
+            "artifact_name": artifact_name,
             "log_callback": log_callback,
             "token_usage_accumulator": token_usage_accumulator,
             "collections_root": collections_root,
         }
-        agent = create_review_agent(provider_config, self.config, paper_pages, context=context)
+        agent = create_review_agent(provider_config, self.config, artifact_pages, context=context)
         result = self._get_review_result(agent, prompt, provider_config, log_callback, token_usage_accumulator)
-        result["question_id"] = question_id
-        result["question_text"] = question_data.get("text")
-        result["supporting_texts"] = enhance_supporting_texts_with_highlighting(result.get("supporting_texts", []), paper_pages)
+        result["criterion_id"] = criterion_id
+        result["criterion_text"] = criterion.get("description") or criterion.get("text", "")
+        result["supporting_texts"] = enhance_supporting_texts_with_highlighting(result.get("supporting_texts", []), artifact_pages)
         
-        existing_answers[question_id] = result
-        save_answers(answers_file, existing_answers)
+        existing_evaluations[criterion_id] = result
+        save_evaluations(evaluations_file, existing_evaluations)
 
         return result
     
-    def _execute_batch(self, collection_name: str, review_process_name: str, paper_name: str,
-                       checklist_name: str, questions_data: List[Dict[str, Any]], log_callback,
+    def _execute_batch(self, collection_name: str, pipeline_name: str, artifact_name: str,
+                       criteria_set_name: str, criteria: List[Dict[str, Any]], log_callback,
                        token_usage_accumulator: Optional[Dict[str, Any]] = None,
                        collections_root: Optional[Path] = None) -> Dict[str, Any]:
-        answers_file = get_answer_file_path(collection_name, review_process_name, paper_name, checklist_name, collections_root)
-        existing_answers = load_existing_answers(answers_file)
+        evaluations_file = get_evaluations_file_path(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
+        existing_evaluations = load_existing_evaluations(evaluations_file)
         
         force_review = self.config.get("force_review", False)
         questions_to_answer = []
-        for q in questions_data:
-            question_id = q.get("id")
-            if question_id not in existing_answers or force_review:
+        for q in criteria:
+            criterion_id = q.get("id")
+            if criterion_id not in existing_evaluations or force_review:
                 questions_to_answer.append(q)
         
         if not questions_to_answer:
             if log_callback:
-                log_callback(f"All {len(questions_data)} questions already have answers", "info")
-            return {"status": "completed", "answered": 0, "total": len(questions_data)}
+                log_callback(f"All {len(criteria)} questions already have answers", "info")
+            return {"status": "completed", "answered": 0, "total": len(criteria)}
         
-        paper_json_path, paper_md_path = get_paper_file_paths(collection_name, review_process_name, paper_name, checklist_name, collections_root)
+        artifact_json_path, artifact_md_path = get_artifact_file_paths(collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root)
         
-        if not paper_json_path.exists():
-            return self._log_error(f"Paper metadata JSON not found: {paper_json_path}", log_callback)
+        if not artifact_json_path.exists():
+            return self._log_error(f"Paper metadata JSON not found: {artifact_json_path}", log_callback)
         
-        with open(paper_json_path, "r", encoding="utf-8") as f:
-            paper_metadata = json.load(f)
+        with open(artifact_json_path, "r", encoding="utf-8") as f:
+            artifact_metadata = json.load(f)
         
-        method = paper_metadata.get("method", "")
+        method = artifact_metadata.get("method", "")
         if method == "Direct File Upload":
             return self._log_error("Direct File Upload method is not yet implemented. Please reprocess the paper with 'Extracted Content' method.", log_callback)
         
-        if not paper_md_path.exists():
+        if not artifact_md_path.exists():
             return self._log_error(f"Paper markdown file not found. Method was: '{method}'. Please reprocess the paper with 'Extracted Content' method.", log_callback)
         
-        md_content = paper_md_path.read_text(encoding="utf-8")
+        md_content = artifact_md_path.read_text(encoding="utf-8")
         if not md_content.strip():
             return self._log_error(f"Paper content is empty. Method: {method}", log_callback)
         
         md_content = clean_text_for_encoding(md_content)
-        paper_pages = extract_pages_from_markdown(md_content)
+        artifact_pages = extract_pages_from_markdown(md_content)
         
         if self.config.get("use_rag", False) and log_callback:
             log_callback("Warning: RAG is not supported in batch mode. Using full paper content instead.", "warning")
         
         context_content = md_content
-        context_pages = paper_pages
+        context_pages = artifact_pages
         
         if isinstance(context_content, str):
             context_content = clean_text_for_encoding(context_content)
@@ -171,51 +175,51 @@ class QuestionReviewer(BaseComponent):
         prompt = clean_text_for_encoding(prompt)
         context = {
             "collection_name": collection_name,
-            "review_process_name": review_process_name,
-            "checklist_name": checklist_name,
-            "paper_name": paper_name,
+            "pipeline_name": pipeline_name,
+            "criteria_set_name": criteria_set_name,
+            "artifact_name": artifact_name,
             "log_callback": log_callback,
             "token_usage_accumulator": token_usage_accumulator,
             "collections_root": collections_root,
         }
         # Agent (and tools from self.config) is the same as in single mode; tools are used in batch mode too.
-        agent = create_review_agent(provider_config, self.config, paper_pages, context=context)
+        agent = create_review_agent(provider_config, self.config, artifact_pages, context=context)
         batch_result = self._get_batch_review_result(agent, prompt, provider_config, questions_to_answer, log_callback, token_usage_accumulator)
 
         # Guarantee one result per question: index by normalized id and fill missing with error response.
         results_by_id = {}
         for answer_data in batch_result:
-            qid = answer_data.get("question_id")
+            qid = answer_data.get("criterion_id")
             if qid is not None and qid != "":
                 results_by_id[str(qid)] = answer_data
 
         all_results = []
         for q in questions_to_answer:
-            question_id = q.get("id")
-            id_canon = str(question_id) if question_id is not None else ""
+            criterion_id = q.get("id")
+            id_canon = str(criterion_id) if criterion_id is not None else ""
             answer_data = results_by_id.get(id_canon) if id_canon else None
             if not answer_data:
                 if log_callback:
-                    log_callback(f"No answer returned for question id {question_id}; using error placeholder", "warning")
+                    log_callback(f"No answer returned for question id {criterion_id}; using error placeholder", "warning")
                 answer_data = self._error_response("Batch did not return an answer for this question.")
 
             result = {
-                "question_id": question_id,
-                "question_text": q.get("text"),
+                "criterion_id": criterion_id,
+                "criterion_text": q.get("description") or q.get("text", ""),
                 "answer": answer_data.get("answer", False),
                 "supporting_texts": enhance_supporting_texts_with_highlighting(
-                    answer_data.get("supporting_texts", []), paper_pages
+                    answer_data.get("supporting_texts", []), artifact_pages
                 )
             }
-            existing_answers[question_id] = result
+            existing_evaluations[criterion_id] = result
             all_results.append(result)
 
-        save_answers(answers_file, existing_answers)
+        save_evaluations(evaluations_file, existing_evaluations)
 
         if log_callback:
             log_callback(f"Successfully answered {len(all_results)} questions", "info")
 
-        return {"status": "completed", "answered": len(all_results), "total": len(questions_data), "results": all_results}
+        return {"status": "completed", "answered": len(all_results), "total": len(criteria), "results": all_results}
 
     def _error_response(self, reason: str):
         return {"answer": False, "supporting_texts": [{"page_number": -1, "text_crop": reason, "short_explanation": reason}], "error": reason}
@@ -230,7 +234,7 @@ class QuestionReviewer(BaseComponent):
         """Ensure exactly one result per question in order; fill missing with error placeholder."""
         by_id = {}
         for r in result_list:
-            qid = r.get("question_id")
+            qid = r.get("criterion_id")
             if qid is not None and str(qid) not in by_id:
                 by_id[str(qid)] = r
         ordered = []
@@ -244,7 +248,7 @@ class QuestionReviewer(BaseComponent):
                 if log_callback:
                     log_callback(f"Filling missing answer for question id {qid}", "warning")
                 ordered.append({
-                    "question_id": qid,
+                    "criterion_id": qid,
                     "answer": False,
                     "supporting_texts": [{"page_number": -1, "text_crop": default_error, "short_explanation": default_error}],
                 })
@@ -314,15 +318,15 @@ class QuestionReviewer(BaseComponent):
             result_list = []
             for answer in answers:
                 result_list.append({
-                    "question_id": answer.get("question_id", ""),
+                    "criterion_id": answer.get("criterion_id", ""),
                     "answer": answer.get("answer", False),
                     "supporting_texts": answer.get("supporting_texts", [])
                 })
 
             # Normalize IDs to str so "1" and 1 match when comparing
-            answered_ids = {str(a.get("question_id", "")) for a in result_list}
-            question_ids = {str(q.get("id", "")) for q in questions}
-            missing_ids = question_ids - answered_ids
+            answered_ids = {str(a.get("criterion_id", "")) for a in result_list}
+            criterion_ids = {str(q.get("id", "")) for q in questions}
+            missing_ids = criterion_ids - answered_ids
 
             if missing_ids and log_callback:
                 log_callback(f"Warning: {len(missing_ids)} questions not answered in batch response. Attempting fallback.", "warning")
@@ -337,7 +341,7 @@ class QuestionReviewer(BaseComponent):
                                 token_usage_add(token_usage_accumulator, single_response, agent)
                             single_result = single_response.structured_output.model_dump()
                             result_list.append({
-                                "question_id": raw_id,
+                                "criterion_id": raw_id,
                                 "answer": single_result.get("answer", False),
                                 "supporting_texts": single_result.get("supporting_texts", [])
                             })
@@ -345,7 +349,7 @@ class QuestionReviewer(BaseComponent):
                             if log_callback:
                                 log_callback(f"Failed to answer question {raw_id} in fallback: {str(e)}", "error")
                             result_list.append({
-                                "question_id": raw_id,
+                                "criterion_id": raw_id,
                                 "answer": False,
                                 "supporting_texts": [{"page_number": -1, "text_crop": f"Failed to answer: {str(e)}", "short_explanation": "Error during batch processing"}]
                             })
@@ -403,11 +407,11 @@ if __name__ == "__main__":
         "rag_chunking_strategy": "page",
     }
     
-    reviewer = QuestionReviewer(config=config)
+    reviewer = CriterionEvaluator(config=config)
     result = reviewer.execute({
         "collection_name": "ml_papers",
-        "review_process_name": "Demo Review Process",
-        "paper_name": "EDITING MODELS WITH TASK ARITHMETIC.pdf",
+        "pipeline_name": "Demo Review Process",
+        "artifact_name": "EDITING MODELS WITH TASK ARITHMETIC.pdf",
         "question": mock_question,
     })
     print(json.dumps(result, indent=2))

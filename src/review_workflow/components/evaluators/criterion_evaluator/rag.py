@@ -12,13 +12,13 @@ def _slug(name: str) -> str:
     return name.strip().replace(" ", "_").lower() or "process"
 
 
-def _chunk_by_page(text: str, paper_pages: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+def _chunk_by_page(text: str, artifact_pages: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
     chunks = []
     chunk_id = 0
-    paper_pages = paper_pages or []
+    artifact_pages = artifact_pages or []
     
-    if paper_pages:
-        for page_info in paper_pages:
+    if artifact_pages:
+        for page_info in artifact_pages:
             page_num = page_info.get("page_number", chunk_id + 1)
             page_content = page_info.get("content", page_info.get("text", ""))
             
@@ -124,18 +124,18 @@ def _chunk_by_paragraph(text: str) -> List[Dict[str, Any]]:
     }]
 
 
-def _extract_page_info_from_chunk(chunk_text: str, chunk_start: int, chunk_end: int, paper_pages: List[Dict[str, Any]], full_text: str) -> Optional[int]:
+def _extract_page_info_from_chunk(chunk_text: str, chunk_start: int, chunk_end: int, artifact_pages: List[Dict[str, Any]], full_text: str) -> Optional[int]:
     page_markers = list(re.finditer(r"---\s+end\s+of\s+page=(\d+)\s+---", full_text[:chunk_end]))
     if page_markers:
         return int(page_markers[-1].group(1))
     
-    if not paper_pages:
+    if not artifact_pages:
         return None
     
     chunk_lower = chunk_text.lower().strip()
     chunk_sample = chunk_lower[:200] if len(chunk_lower) > 200 else chunk_lower
     
-    for page_info in paper_pages:
+    for page_info in artifact_pages:
         page_content = page_info.get("content", "").lower()
         page_num = page_info.get("page_number")
         
@@ -163,7 +163,7 @@ class RAG:
     def create_vector_db(
         self,
         paper_content: str,
-        paper_pages: Optional[List[Dict[str, Any]]] = None,
+        artifact_pages: Optional[List[Dict[str, Any]]] = None,
         db_path: Optional[Path] = None,
         chunking_strategy: str = "page",
         force_recreate: bool = False,
@@ -183,7 +183,7 @@ class RAG:
                 db_path.unlink(missing_ok=True)
 
         if chunking_strategy == "page":
-            chunks = _chunk_by_page(paper_content, paper_pages or [])
+            chunks = _chunk_by_page(paper_content, artifact_pages or [])
         elif chunking_strategy == "paragraph":
             chunks = _chunk_by_paragraph(paper_content)
         else:
@@ -203,11 +203,11 @@ class RAG:
             "base_url": None
         }
         
-        paper_pages = paper_pages or []
+        artifact_pages = artifact_pages or []
         for chunk in chunks:
             if "page_number" not in chunk or chunk.get("page_number") is None:
                 page_num = _extract_page_info_from_chunk(
-                    chunk["text"], chunk["start"], chunk["end"], paper_pages, paper_content
+                    chunk["text"], chunk["start"], chunk["end"], artifact_pages, paper_content
                 )
                 chunk["page_number"] = page_num if page_num is not None else -1
         
@@ -257,7 +257,7 @@ class RAG:
 
 def create_vector_db(
     paper_content: str,
-    paper_pages: Optional[List[Dict[str, Any]]] = None,
+    artifact_pages: Optional[List[Dict[str, Any]]] = None,
     db_path: Optional[Path] = None,
     embedding_provider_id: Optional[str] = None,
     chunking_strategy: str = "page",
@@ -267,7 +267,7 @@ def create_vector_db(
     rag = RAG(embedding_provider_id=embedding_provider_id)
     return rag.create_vector_db(
         paper_content=paper_content,
-        paper_pages=paper_pages,
+        artifact_pages=artifact_pages,
         db_path=db_path,
         chunking_strategy=chunking_strategy,
         force_recreate=force_recreate,
@@ -305,10 +305,10 @@ def format_chunks_for_prompt(chunks: List[Dict[str, Any]]) -> str:
 
 def get_vector_db_path(
     collection_name: str,
-    review_process_name: str,
-    paper_name: str,
+    pipeline_name: str,
+    artifact_name: str,
     project_root: Optional[Path] = None,
-    checklist_name: Optional[str] = None,
+    criteria_set_name: Optional[str] = None,
     collections_root: Optional[Path] = None
 ) -> Path:
     if collections_root is None:
@@ -316,15 +316,15 @@ def get_vector_db_path(
             project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
         collections_root = project_root / "workspaces" / "guest" / "collections"
     
-    paper_dir = Path(collections_root) / _slug(collection_name) / "review_processes" / _slug(review_process_name)
+    paper_dir = Path(collections_root) / _slug(collection_name) / "review_runs" / _slug(pipeline_name)
     
-    # If checklist_name is provided, add it to the path
-    if checklist_name:
-        checklist_name_clean = checklist_name
-        if checklist_name_clean.endswith('.json'):
-            checklist_name_clean = checklist_name_clean[:-5]
-        paper_dir = paper_dir / _slug(checklist_name_clean)
+    # If criteria_set_name is provided, add it to the path
+    if criteria_set_name:
+        criteria_set_name_clean = criteria_set_name
+        if criteria_set_name_clean.endswith('.json'):
+            criteria_set_name_clean = criteria_set_name_clean[:-5]
+        paper_dir = paper_dir / _slug(criteria_set_name_clean)
     
-    paper_dir = paper_dir / paper_name
+    paper_dir = paper_dir / artifact_name
     paper_dir.mkdir(parents=True, exist_ok=True)
     return paper_dir / "vector_db.pkl"

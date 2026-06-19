@@ -39,10 +39,9 @@ class TaskProgress:
 class BackgroundTask:
     task_id: str
     collection_name: str
-    process_name: str
-    checklist_name: str
-    process_data: Dict[str, Any]
-    papers: List[Dict[str, Any]]
+    pipeline_id: str
+    criteria_set_name: str
+    artifacts: List[Dict[str, Any]]
     progress: TaskProgress = field(default_factory=TaskProgress)
     thread: Optional[threading.Thread] = None
     process: Optional["multiprocessing.Process"] = None
@@ -50,9 +49,9 @@ class BackgroundTask:
 
 
 class TaskManager:
-    _instance: Optional['TaskManager'] = None
+    _instance: Optional["TaskManager"] = None
     _lock = threading.Lock()
-    
+
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -60,109 +59,73 @@ class TaskManager:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
         self._initialized = True
         self._tasks: Dict[str, BackgroundTask] = {}
         self._tasks_lock = threading.RLock()
-    
+
     def create_task(
         self,
         collection_name: str,
-        process_name: str,
-        checklist_name: str,
-        process_data: Dict[str, Any],
-        papers: List[Dict[str, Any]],
+        pipeline_id: str,
+        criteria_set_name: str,
+        artifacts: List[Dict[str, Any]],
     ) -> str:
         task_id = str(uuid.uuid4())
-        
         task = BackgroundTask(
             task_id=task_id,
             collection_name=collection_name,
-            process_name=process_name,
-            checklist_name=checklist_name,
-            process_data=process_data,
-            papers=papers,
+            pipeline_id=pipeline_id,
+            criteria_set_name=criteria_set_name,
+            artifacts=artifacts,
         )
         task.progress.status = TaskStatus.PENDING
-        task.progress.total = len(papers)
+        task.progress.total = len(artifacts)
         task.progress.started_at = datetime.now()
-        
         with self._tasks_lock:
             self._tasks[task_id] = task
-        
         return task_id
-    
+
     def get_task(self, task_id: str) -> Optional[BackgroundTask]:
         with self._tasks_lock:
             return self._tasks.get(task_id)
-    
-    def get_all_tasks(self) -> Dict[str, BackgroundTask]:
-        with self._tasks_lock:
-            return self._tasks.copy()
-    
+
     def get_tasks_for_collection(self, collection_name: str) -> List[BackgroundTask]:
         with self._tasks_lock:
-            return [
-                task for task in self._tasks.values()
-                if task.collection_name == collection_name
-            ]
-    
+            return [t for t in self._tasks.values() if t.collection_name == collection_name]
+
     def get_running_task_for_collection(self, collection_name: str) -> Optional[BackgroundTask]:
-        tasks = self.get_tasks_for_collection(collection_name)
-        for task in tasks:
+        for task in self.get_tasks_for_collection(collection_name):
             if task.progress.status == TaskStatus.RUNNING:
                 return task
         return None
-    
+
     def stop_task(self, task_id: str) -> bool:
         task = self.get_task(task_id)
         if not task:
             return False
         if task.progress.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
             task.stop_event.set()
-            logger.info(f"Stop event set for task {task_id}")
             if task.progress.status == TaskStatus.PENDING:
                 task.progress.status = TaskStatus.STOPPED
                 task.progress.completed_at = datetime.now()
-                logger.info(f"Task {task_id} marked as STOPPED (was PENDING)")
-            
             return True
-        
         return False
-    
+
     def stop_all_tasks_for_collection(self, collection_name: str) -> int:
-        tasks = self.get_tasks_for_collection(collection_name)
-        stopped_count = 0
-        for task in tasks:
-            if task.progress.status == TaskStatus.RUNNING:
-                if self.stop_task(task.task_id):
-                    stopped_count += 1
-        return stopped_count
-    
+        stopped = 0
+        for task in self.get_tasks_for_collection(collection_name):
+            if task.progress.status == TaskStatus.RUNNING and self.stop_task(task.task_id):
+                stopped += 1
+        return stopped
+
     def delete_task(self, task_id: str) -> bool:
-        """Delete a task (after it's completed or stopped)."""
         with self._tasks_lock:
             task = self._tasks.get(task_id)
             if task and task.progress.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED):
                 del self._tasks[task_id]
                 return True
             return False
-    
-    def cleanup_old_tasks(self, max_age_hours: int = 24):
-        from datetime import timedelta
-        cutoff = datetime.now() - timedelta(hours=max_age_hours)
-        
-        with self._tasks_lock:
-            to_delete = [
-                task_id for task_id, task in self._tasks.items()
-                if task.progress.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED)
-                and task.progress.completed_at
-                and task.progress.completed_at < cutoff
-            ]
-            for task_id in to_delete:
-                del self._tasks[task_id]
-        
-        logger.info(f"Cleaned up {len(to_delete)} old tasks")

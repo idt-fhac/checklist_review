@@ -1,16 +1,16 @@
 import re
 from typing import Dict, Any, List, Optional
 
-from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
 
 
-def build_prompt_with_pages(question_text: str, paper_content: str, paper_pages: Optional[List[Dict[str, Any]]]) -> str:
-    question_text = clean_text_for_encoding(question_text)
+def build_prompt_with_pages(criterion_text: str, paper_content: str, artifact_pages: Optional[List[Dict[str, Any]]]) -> str:
+    criterion_text = clean_text_for_encoding(criterion_text)
     if isinstance(paper_content, str):
         paper_content = clean_text_for_encoding(paper_content)
     
-    # prompt = f"Answer this question based on the paper content: {question_text}\n\n"
-    prompt = f"Question: {question_text}\n\n"
+    # prompt = f"Answer this question based on the paper content: {criterion_text}\n\n"
+    prompt = f"Question: {criterion_text}\n\n"
     rag_separator = "=" * 80
     
     if rag_separator in paper_content:
@@ -41,9 +41,9 @@ def build_prompt_with_pages(question_text: str, paper_content: str, paper_pages:
                 prompt += f"\n\n\n-------------------------> PAGE {page_num} ---\n\n{content}\n\n"
         
         prompt += f"{rag_separator}\n"
-    elif paper_pages:
+    elif artifact_pages:
         prompt += f"Paper Content (with page numbers):\n{rag_separator}\n"
-        for page_info in paper_pages:
+        for page_info in artifact_pages:
             page_num = page_info.get("page_number", "?")
             page_text = page_info.get("content", page_info.get("text", ""))
             page_text = clean_text_for_encoding(str(page_text))
@@ -57,16 +57,16 @@ def build_prompt_with_pages(question_text: str, paper_content: str, paper_pages:
     return prompt
 
 
-def build_batch_prompt(questions: List[Dict[str, Any]], paper_content: str, paper_pages: Optional[List[Dict[str, Any]]]) -> str:
+def build_batch_prompt(questions: List[Dict[str, Any]], paper_content: str, artifact_pages: Optional[List[Dict[str, Any]]]) -> str:
     prompt = "You need to answer multiple questions about the paper. Here are the questions:\n\n"
     
     for idx, question in enumerate(questions, 1):
-        question_id = question.get("id", f"q{idx}")
-        question_text = clean_text_for_encoding(question.get('text', ''))
-        prompt += f"Question {idx} (ID: {question_id}): {question_text}\n\n"
+        criterion_id = question.get("id", f"q{idx}")
+        criterion_text = clean_text_for_encoding(question.get('text', ''))
+        prompt += f"Question {idx} (ID: {criterion_id}): {criterion_text}\n\n"
     
-    prompt += "CRITICAL: When providing your answers, you MUST use the exact question_id from above for each answer. "
-    prompt += "The question_id must match exactly (e.g., if the question ID is 'q1', use 'q1' in your answer, not 'Question 1' or '1').\n\n"
+    prompt += "CRITICAL: When providing your answers, you MUST use the exact criterion_id from above for each answer. "
+    prompt += "The criterion_id must match exactly (e.g., if the question ID is 'q1', use 'q1' in your answer, not 'Question 1' or '1').\n\n"
     
     prompt += "\n" + "=" * 80 + "\n"
     rag_separator = "=" * 80
@@ -99,9 +99,9 @@ def build_batch_prompt(questions: List[Dict[str, Any]], paper_content: str, pape
                 prompt += f"\n--- PAGE {page_num} ---\n{content}\n"
         
         prompt += f"{rag_separator}\n"
-    elif paper_pages:
+    elif artifact_pages:
         prompt += f"Paper Content (with page numbers):\n{rag_separator}\n"
-        for page_info in paper_pages:
+        for page_info in artifact_pages:
             page_num = page_info.get("page_number", "?")
             page_text = page_info.get("content", page_info.get("text", ""))
             page_text = clean_text_for_encoding(str(page_text))
@@ -114,7 +114,7 @@ def build_batch_prompt(questions: List[Dict[str, Any]], paper_content: str, pape
     
     prompt += "\nIMPORTANT: You MUST provide answers for ALL questions listed above. "
     prompt += "Each answer MUST include:\n"
-    prompt += "1. The question_id that matches one of the questions above\n"
+    prompt += "1. The criterion_id that matches one of the questions above\n"
     prompt += "2. An answer (True/False)\n"
     prompt += "3. Supporting text items with page_number (1-indexed, or -1 for analysis-only), verbatim text_crop, and short_explanation\n"
     prompt += "4. At least one supporting text should reference a specific page when possible\n"

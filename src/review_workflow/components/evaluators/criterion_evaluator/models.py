@@ -14,7 +14,7 @@ class ReviewResponse(BaseModel):
 
 
 class QuestionAnswer(BaseModel):
-    question_id: str = Field(description="The ID of the question being answered")
+    criterion_id: str = Field(description="The ID of the question being answered")
     answer: bool = Field(description="The answer to the question (True/False)")
     supporting_texts: List[SupportingTextItem] = Field(description="List of supporting text items. Each item should have a page_number (or -1 for analysis-only), text_crop, and short_explanation. At least one item should reference a specific page when possible.")
 

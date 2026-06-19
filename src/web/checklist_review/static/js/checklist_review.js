@@ -101,7 +101,7 @@ const GenericNode = ({ id, data, isConnectable, selected, providers = [], onOpen
     
     // Automatically disable RAG when "answer_all_together" is enabled
     useEffect(() => {
-        if (component_id === 'question_reviewer' && config.answer_all_together === true && config.use_rag === true) {
+        if (component_id === 'criterion_evaluator' && config.answer_all_together === true && config.use_rag === true) {
             if (onConfigChange) {
                 onConfigChange(id, 'use_rag', false);
             }
@@ -119,7 +119,7 @@ const GenericNode = ({ id, data, isConnectable, selected, providers = [], onOpen
         }
     };
 
-    const IGNORED_CONFIG = ['collection_name', 'review_process_name', 'paper_name', 'checklist_name', 'force_review'];
+    const IGNORED_CONFIG = ['collection_name', 'pipeline_id', 'paper_name', 'criteria_set_name', 'force_review'];
 
     // Function to evaluate ui:if conditions
     const evaluateCondition = useCallback((condition, currentConfig) => {
@@ -147,7 +147,7 @@ const GenericNode = ({ id, data, isConnectable, selected, providers = [], onOpen
     const visibleProperties = useMemo(() => {
         if (!config_schema?.properties) return [];
 
-        // For question_reviewer, explicitly define the order to ensure RAG fields appear after use_rag
+        // For criterion_evaluator, explicitly define the order to ensure RAG fields appear after use_rag
         const questionReviewerOrder = [
             'provider_id',
             'system_prompt', 
@@ -159,7 +159,7 @@ const GenericNode = ({ id, data, isConnectable, selected, providers = [], onOpen
         ];
         // For specialist, Topic first then Criteria then provider_id
         const specialistOrder = ['topic', 'criteria', 'provider_id'];
-        // For paper_loader, Extraction Method first then Extract Pages as Image then Force Execution
+        // For document_loader, Extraction Method first then Extract Pages as Image then Force Execution
         const paperLoaderOrder = ['extraction_method', 'extract_pages_as_image', 'force_execution'];
 
         const result = [];
@@ -179,11 +179,11 @@ const GenericNode = ({ id, data, isConnectable, selected, providers = [], onOpen
             }
         };
 
-        if (component_id === 'question_reviewer') {
+        if (component_id === 'criterion_evaluator') {
             applyExplicitOrder(questionReviewerOrder);
         } else if (component_id === 'specialist') {
             applyExplicitOrder(specialistOrder);
-        } else if (component_id === 'paper_loader') {
+        } else if (component_id === 'document_loader') {
             applyExplicitOrder(paperLoaderOrder);
         } else {
             // For other components, use Object.entries() which preserves insertion order
@@ -345,7 +345,7 @@ const createNodeTypes = (providers, onOpenTextEditor) => ({
 });
 
 // Protected node component IDs that cannot be deleted
-const PROTECTED_NODES = ['paper_loader', 'question_reviewer'];
+const PROTECTED_NODES = ['document_loader', 'criterion_evaluator'];
 
 // --- Main Editor Component ---
 const ProcessEditor = () => {
@@ -502,13 +502,13 @@ const ProcessEditor = () => {
         // Connection validation rules:
         // 1. pre-processing -> only to question reviewer
         // 2. tools -> only to question reviewer
-        // 3. question_reviewer -> only to post-processing
+        // 3. criterion_evaluator -> only to post-processing
 
         if (sourceCategory === 'pre_process') {
-            return targetComponentId === 'question_reviewer';
+            return targetComponentId === 'criterion_evaluator';
         } else if (sourceCategory === 'tool') {
-            return targetComponentId === 'question_reviewer';
-        } else if (sourceComponentId === 'question_reviewer') {
+            return targetComponentId === 'criterion_evaluator';
+        } else if (sourceComponentId === 'criterion_evaluator') {
             return targetCategory === 'post_process';
         }
 
@@ -533,17 +533,17 @@ const ProcessEditor = () => {
         // Connection validation rules:
         // 1. pre-processing -> only to question reviewer
         // 2. tools -> only to question reviewer
-        // 3. question_reviewer -> only to post-processing
+        // 3. criterion_evaluator -> only to post-processing
 
         let isValidConnection = false;
 
         if (sourceCategory === 'pre_process') {
             // Pre-processing can only connect to question reviewer
-            isValidConnection = targetComponentId === 'question_reviewer';
+            isValidConnection = targetComponentId === 'criterion_evaluator';
         } else if (sourceCategory === 'tool') {
             // Tools can only connect to question reviewer
-            isValidConnection = targetComponentId === 'question_reviewer';
-        } else if (sourceComponentId === 'question_reviewer') {
+            isValidConnection = targetComponentId === 'criterion_evaluator';
+        } else if (sourceComponentId === 'criterion_evaluator') {
             // Question reviewer can only connect to post-processing
             isValidConnection = targetCategory === 'post_process';
         } else {
@@ -564,8 +564,8 @@ const ProcessEditor = () => {
         // Connection is valid, proceed with creating edge
         let className = '';
         // Animate edges from pre_process to review, and from review to post_process
-        if ((sourceCategory === 'pre_process' && targetComponentId === 'question_reviewer') ||
-            (sourceComponentId === 'question_reviewer' && targetCategory === 'post_process')) {
+        if ((sourceCategory === 'pre_process' && targetComponentId === 'criterion_evaluator') ||
+            (sourceComponentId === 'criterion_evaluator' && targetCategory === 'post_process')) {
             className = 'animated';
         }
 
@@ -807,7 +807,7 @@ const ProcessEditor = () => {
         if (!type || !meta) return;
 
         // Find Question Reviewer node for auto-connections
-        const questionReviewerNode = nodes.find(n => n.data?.component_id === 'question_reviewer');
+        const questionReviewerNode = nodes.find(n => n.data?.component_id === 'criterion_evaluator');
 
         let position;
         let newEdge = null;
@@ -933,8 +933,8 @@ const ProcessEditor = () => {
         const TOOL_VERTICAL_OFFSET = 350; // Fixed distance tools are below question reviewer (from top of QR to top of tools)
 
         // Group nodes by category
-        const questionReviewer = nodesToLayout.find(n => n.data?.component_id === 'question_reviewer');
-        const preProcessNodes = nodesToLayout.filter(n => n.data?.category === 'pre_process' && n.data?.component_id !== 'question_reviewer');
+        const questionReviewer = nodesToLayout.find(n => n.data?.component_id === 'criterion_evaluator');
+        const preProcessNodes = nodesToLayout.filter(n => n.data?.category === 'pre_process' && n.data?.component_id !== 'criterion_evaluator');
         const toolNodes = nodesToLayout.filter(n => n.data?.category === 'tool');
         const postProcessNodes = nodesToLayout.filter(n => n.data?.category === 'post_process');
 
@@ -942,7 +942,7 @@ const ProcessEditor = () => {
         const estimateNodeHeight = (node) => {
             const configSchema = node.data?.config_schema;
             const controlCount = configSchema?.properties ? Object.keys(configSchema.properties).filter(key =>
-                !['collection_name', 'review_process_name', 'paper_name', 'checklist_name'].includes(key)
+                !['collection_name', 'pipeline_id', 'paper_name', 'criteria_set_name'].includes(key)
             ).length : 0;
             return NODE_HEIGHT_BASE + (controlCount * NODE_HEIGHT_PER_CONTROL);
         };
@@ -1034,7 +1034,7 @@ const ProcessEditor = () => {
         const otherNodes = nodesToLayout.filter(n => {
             const cat = n.data?.category;
             return cat !== 'pre_process' && cat !== 'review' && cat !== 'tool' && cat !== 'post_process' &&
-                n.data?.component_id !== 'question_reviewer';
+                n.data?.component_id !== 'criterion_evaluator';
         });
 
         if (otherNodes.length > 0) {
@@ -1678,7 +1678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             try {
                 // Fetch process data
-                const res = await fetch(`/checklist_review/api/processes/${processName}`);
+                const res = await fetch(`/checklist_review/api/pipelines/${processName}`);
                 if (!res.ok) {
                     throw new Error('Failed to load process');
                 }
@@ -2010,7 +2010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const outputsContainer = document.getElementById('outputsContainer');
     const outputsTitle = document.getElementById('outputsTitle');
     const deleteResultBtn = document.getElementById('deleteResultBtn');
-    /** When a result is shown, holds { collection_name, process_name, checklist_name, paper_id } for the Outputs tab */
+    /** When a result is shown, holds { collection_name, pipeline_id, criteria_set_name, paper_id } for the Outputs tab */
     let currentResultContext = null;
     // Outputs tab elements are initialized early to avoid TDZ in startup flows.
     let outputsModalSelect = null;
@@ -2375,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentValue = preserveSelection && currentSelectedProcess ? currentSelectedProcess.slug : null;
         
         try {
-            const res = await fetch(`/checklist_review/api/processes`);
+            const res = await fetch(`/checklist_review/api/pipelines`);
             const data = await res.json();
             
             if (data.length === 0) {
@@ -2532,7 +2532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         try {
             // Fetch process data
-            const res = await fetch(`/checklist_review/api/processes/${processSlug}`);
+            const res = await fetch(`/checklist_review/api/pipelines/${processSlug}`);
             if (!res.ok) {
                 throw new Error('Failed to load process');
             }
@@ -2792,7 +2792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         try {
-            const res = await fetch(`/checklist_review/api/processes/${name}`);
+            const res = await fetch(`/checklist_review/api/pipelines/${name}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data && (data.nodes || data.edges)) {
@@ -3460,7 +3460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             // Checklist Review page - fetch from API
             try {
-                const processRes = await fetch(`/checklist_review/api/processes/${processName}`);
+                const processRes = await fetch(`/checklist_review/api/pipelines/${processName}`);
                 if (processRes.ok) {
                     processData = await processRes.json();
                 } else {
@@ -3487,8 +3487,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify({
                     collection_name: currentCollection,
                     process_data: processData,
-                    process_name: processName,
-                    checklist_name: checklistName
+                    pipeline_id: processName,
+                    criteria_set_name: checklistName
                 })
             });
 
@@ -3577,8 +3577,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             try {
                 const query = new URLSearchParams({
                     collection_name: currentCollection,
-                    process_name: selectedProcess.slug,
-                    checklist_name: selectedChecklist.name
+                    pipeline_id: selectedProcess.slug,
+                    criteria_set_name: selectedChecklist.name
                 });
 
                 const listRes = await fetch(`/checklist_review/api/results?${query.toString()}`);
@@ -3643,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadPapersList() {
         papersList.innerHTML = '<div class="p-2 text-muted">Loading...</div>';
         try {
-            const papersRes = await fetch(`/checklist_review/api/papers?collection_name=${currentCollection}`);
+            const papersRes = await fetch(`/checklist_review/api/artifacts?collection_name=${currentCollection}`);
             const papers = await papersRes.json();
 
             const selectedProcess = getSelectedProcess();
@@ -3652,7 +3652,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const checklistName = selectedChecklist ? selectedChecklist.name : null;
             let resultMap = new Map();
             if (processName && checklistName) {
-                const resultsRes = await fetch(`/checklist_review/api/results?collection_name=${currentCollection}&process_name=${processName}&checklist_name=${encodeURIComponent(checklistName)}`);
+                const resultsRes = await fetch(`/checklist_review/api/results?collection_name=${currentCollection}&pipeline_id=${processName}&criteria_set_name=${encodeURIComponent(checklistName)}`);
                 const results = await resultsRes.json();
                 resultMap = new Map(results.map(r => [r.filename, r]));
             }
@@ -3777,7 +3777,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             try {
                 const paperId = paper.paper_id || paper.filename || paper.title;
-                const res = await fetch(`/checklist_review/api/papers/${encodeURIComponent(paperId)}?collection_name=${encodeURIComponent(currentCollection)}`, {
+                const res = await fetch(`/checklist_review/api/artifacts/${encodeURIComponent(paperId)}?collection_name=${encodeURIComponent(currentCollection)}`, {
                     method: 'DELETE'
                 });
                 
@@ -4015,7 +4015,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            const res = await fetch(`/checklist_review/api/results?collection_name=${currentCollection}&paper_id=${encodeURIComponent(paperId)}&process_name=${encodeURIComponent(processName)}&checklist_name=${encodeURIComponent(checklistName)}`);
+            const res = await fetch(`/checklist_review/api/results?collection_name=${currentCollection}&paper_id=${encodeURIComponent(paperId)}&pipeline_id=${encodeURIComponent(processName)}&criteria_set_name=${encodeURIComponent(checklistName)}`);
 
             if (!res.ok) {
                 // Handle 404 or other errors gracefully
@@ -4056,8 +4056,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             currentResultContext = {
                 collection_name: currentCollection,
-                process_name: processName,
-                checklist_name: checklistName,
+                pipeline_id: processName,
+                criteria_set_name: checklistName,
                 paper_id: paperId
             };
 
@@ -4203,7 +4203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         alert('Please select a checklist first.');
                         return;
                     }
-                    await fetch(`/checklist_review/api/results/${paperId}?collection_name=${currentCollection}&process_name=${processName}&checklist_name=${encodeURIComponent(checklistName)}`, { method: 'DELETE' });
+                    await fetch(`/checklist_review/api/results/${paperId}?collection_name=${currentCollection}&pipeline_id=${processName}&criteria_set_name=${encodeURIComponent(checklistName)}`, { method: 'DELETE' });
                     outputsContainer.innerHTML = '<div class="text-muted text-center p-4">Result deleted.</div>';
                     deleteResultBtn.style.display = 'none';
                     currentResultContext = null;
@@ -4400,8 +4400,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const params = new URLSearchParams({
                 collection_name: currentResultContext.collection_name,
-                process_name: currentResultContext.process_name,
-                checklist_name: currentResultContext.checklist_name,
+                pipeline_id: currentResultContext.pipeline_id,
+                criteria_set_name: currentResultContext.criteria_set_name,
                 paper_id: currentResultContext.paper_id
             });
             const res = await fetch('/checklist_review/api/outputs/token_usage?' + params.toString());
@@ -4479,8 +4479,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const params = new URLSearchParams({
                 collection_name: currentCollection,
-                process_name: selectedProcess.slug,
-                checklist_name: selectedChecklist.name
+                pipeline_id: selectedProcess.slug,
+                criteria_set_name: selectedChecklist.name
             });
 
             const res = await fetch('/checklist_review/api/outputs/token_usage/collection_summary?' + params.toString());
@@ -4505,8 +4505,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentResultContext) return '#';
         const params = new URLSearchParams({
             collection_name: currentResultContext.collection_name,
-            process_name: currentResultContext.process_name,
-            checklist_name: currentResultContext.checklist_name,
+            pipeline_id: currentResultContext.pipeline_id,
+            criteria_set_name: currentResultContext.criteria_set_name,
             paper_id: currentResultContext.paper_id,
             filename: filename
         });
@@ -4527,8 +4527,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const params = new URLSearchParams({
                 collection_name: currentResultContext.collection_name,
-                process_name: currentResultContext.process_name,
-                checklist_name: currentResultContext.checklist_name,
+                pipeline_id: currentResultContext.pipeline_id,
+                criteria_set_name: currentResultContext.criteria_set_name,
                 paper_id: currentResultContext.paper_id
             });
             const res = await fetch(`/checklist_review/api/outputs?${params.toString()}`);
@@ -4695,7 +4695,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentSelection = currentSelectedProcess ? currentSelectedProcess.slug : null; // Store current selection
 
         try {
-            const res = await fetch('/checklist_review/api/processes', {
+            const res = await fetch('/checklist_review/api/pipelines', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name, data: data })
@@ -4858,7 +4858,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!newName || newName === currentDisplayName) return;
 
             try {
-                const res = await fetch(`/checklist_review/api/processes/${encodeURIComponent(current)}/rename`, {
+                const res = await fetch(`/checklist_review/api/pipelines/${encodeURIComponent(current)}/rename`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -4912,7 +4912,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            const res = await fetch(`/checklist_review/api/processes/${current}`, {
+            const res = await fetch(`/checklist_review/api/pipelines/${current}`, {
                 method: 'DELETE'
             });
 
@@ -4965,7 +4965,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         checklistList.innerHTML = '';
         // Checklists are now global, no collection_name needed
         try {
-            const res = await fetch(`/checklist_review/api/checklists`);
+            const res = await fetch(`/checklist_review/api/criteria-sets`);
             const data = await res.json();
             
             if (data.length === 0) {
@@ -5141,7 +5141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renameBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Renaming...';
             
             try {
-                const res = await fetch(`/checklist_review/api/checklists/${encodeURIComponent(currentName)}/rename`, {
+                const res = await fetch(`/checklist_review/api/criteria-sets/${encodeURIComponent(currentName)}/rename`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -5261,7 +5261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
             
             try {
-                const res = await fetch(`/checklist_review/api/checklists/${encodeURIComponent(checklistName)}`, {
+                const res = await fetch(`/checklist_review/api/criteria-sets/${encodeURIComponent(checklistName)}`, {
                     method: 'DELETE'
                 });
                 const data = await res.json();
@@ -5316,7 +5316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Helper function to view a checklist
     async function viewChecklist(checklistName) {
         try {
-            const res = await fetch(`/checklist_review/api/checklists/${encodeURIComponent(checklistName)}/view`);
+            const res = await fetch(`/checklist_review/api/criteria-sets/${encodeURIComponent(checklistName)}/view`);
             const data = await res.json();
 
             if (res.ok) {
@@ -5550,8 +5550,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else if (event === 'complete') {
                         if (progressBar) progressBar.style.width = '100%';
                         if (progressLabel) {
-                            const msg = data.questions_extracted 
-                                ? `Extracted ${data.questions_extracted} questions successfully!`
+                            const msg = data.criteria_extracted 
+                                ? `Extracted ${data.criteria_extracted} criteria successfully!`
                                 : data.message || 'Upload complete';
                             progressLabel.textContent = msg;
                         }
@@ -5567,7 +5567,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Paper upload handlers
     paperUpload.addEventListener('change', (e) => {
-        handleFileUpload(e.target.files, '/checklist_review/api/papers/upload', true);
+        handleFileUpload(e.target.files, '/checklist_review/api/artifacts/upload', true);
         paperUpload.value = '';
     });
 
@@ -5585,7 +5585,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         paperDropzone.classList.remove('drag-over');
         const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
         if (files.length > 0) {
-            handleFileUpload(files, '/checklist_review/api/papers/upload', true);
+            handleFileUpload(files, '/checklist_review/api/artifacts/upload', true);
         }
         // Don't log upload-related messages in execution log
     });
@@ -5593,7 +5593,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Checklist upload handlers
     if (checklistUpload) {
         checklistUpload.addEventListener('change', (e) => {
-            handleFileUpload(e.target.files, '/checklist_review/api/checklists/upload', true);
+            handleFileUpload(e.target.files, '/checklist_review/api/criteria-sets/upload', true);
             checklistUpload.value = '';
         });
     }
@@ -5623,23 +5623,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         let questionsHtml = '';
         let isPdf = data.type === 'pdf';
         const isExtracted = data.source === 'extracted'; // Indicates this was extracted from PDF
-        let originalQuestions = data.questions ? JSON.parse(JSON.stringify(data.questions)) : [];
+        let originalCriteria = data.criteria ? JSON.parse(JSON.stringify(data.criteria)) : [];
         let hasChanges = false; // Declare at function scope so it's accessible to closeModal
         let checklistName = data.name;
 
-        if (!isPdf && data.questions && data.questions.length > 0) {
+        if (!isPdf && data.criteria && data.criteria.length > 0) {
             const headerNote = isExtracted ? '<div class="alert alert-info mb-3" style="font-size: 0.875rem; padding: 0.75rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px; vertical-align: text-bottom;"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg>This checklist was extracted from a PDF file.</div>' : '';
             questionsHtml = `
                     ${headerNote}
                     <div id="checklistQuestionsContainer" class="list-group" style="max-height: 400px; overflow-y: auto;">
-                        ${data.questions.map((q, idx) => `
-                            <div class="list-group-item question-item" data-question-idx="${idx}" style="border-left: 4px solid #2563eb; margin-bottom: 0.5rem; border-radius: 6px; padding: 1rem;">
+                        ${data.criteria.map((q, idx) => `
+                            <div class="list-group-item criterion-item" data-question-idx="${idx}" style="border-left: 4px solid #2563eb; margin-bottom: 0.5rem; border-radius: 6px; padding: 1rem;">
                                 <div class="d-flex align-items-start gap-2">
                                     <span class="badge bg-primary" style="margin-top: 4px; flex-shrink: 0;">${idx + 1}</span>
                                     <div class="flex-grow-1">
-                                        <textarea class="form-control question-text-input" data-question-id="${q.id || `q${idx+1}`}" style="min-height: 60px; resize: vertical; font-size: 0.9rem;">${(q.text || q.question || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                                        <textarea class="form-control criterion-description-input" data-question-id="${q.id || `q${idx+1}`}" style="min-height: 60px; resize: vertical; font-size: 0.9rem;">${(q.description || q.question || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                                         ${q.id ? `<div class="text-muted small mt-1">ID: ${q.id}</div>` : ''}
-                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-question-btn" style="font-size: 0.75rem;">
+                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-criterion-btn" style="font-size: 0.75rem;">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
                                                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
                                                 <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
@@ -5651,7 +5651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         `).join('')}
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addQuestionBtn" style="border-radius: 6px;">
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addCriterionBtn" style="border-radius: 6px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
                             <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
                         </svg>
@@ -5663,7 +5663,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div id="checklistQuestionsContainer" class="list-group" style="max-height: 400px; overflow-y: auto;">
                     <p class="text-muted">No questions found in this checklist.</p>
                 </div>
-                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addQuestionBtn" style="border-radius: 6px;">
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="addCriterionBtn" style="border-radius: 6px;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
                         <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/>
                     </svg>
@@ -5746,25 +5746,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Handle editing for non-PDF checklists
         if (!isPdf) {
             const questionsContainer = modal.querySelector('#checklistQuestionsContainer');
-            const addQuestionBtn = modal.querySelector('#addQuestionBtn');
+            const addCriterionBtn = modal.querySelector('#addCriterionBtn');
             const saveBtn = modal.querySelector('#saveChecklistBtn');
             const closeBtn = modal.querySelector('#closeChecklistModalBtn');
             const changesIndicator = modal.querySelector('#checklistChangesIndicator');
             
             // Function to check for changes and update UI
             function checkForChanges() {
-                const questionInputs = questionsContainer.querySelectorAll('.question-text-input');
-                const currentQuestions = Array.from(questionInputs).map(input => ({
+                const criterionInputs = questionsContainer.querySelectorAll('.criterion-description-input');
+                const currentQuestions = Array.from(criterionInputs).map(input => ({
                     id: input.dataset.questionId,
                     text: input.value.trim()
-                })).filter(q => q.text.length > 0);
+                })).filter(q => q.description.length > 0);
                 
                 // Compare with original
-                const originalTexts = originalQuestions.map(q => (q.text || q.question || '').trim()).filter(t => t.length > 0);
-                const currentTexts = currentQuestions.map(q => q.text.trim());
+                const originalTexts = originalCriteria.map(q => (q.description || q.question || '').trim()).filter(t => t.length > 0);
+                const currentTexts = currentQuestions.map(q => q.description.trim());
                 
                 hasChanges = JSON.stringify(originalTexts) !== JSON.stringify(currentTexts) || 
-                            questionInputs.length !== originalQuestions.length;
+                            criterionInputs.length !== originalCriteria.length;
                 
                 if (hasChanges) {
                     saveBtn.style.display = 'inline-block';
@@ -5777,22 +5777,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Add change listeners to all textareas
             function attachChangeListeners() {
-                questionsContainer.querySelectorAll('.question-text-input').forEach(input => {
+                questionsContainer.querySelectorAll('.criterion-description-input').forEach(input => {
                     input.addEventListener('input', checkForChanges);
                 });
             }
             
             // Add new question
-            if (addQuestionBtn) {
-                addQuestionBtn.addEventListener('click', () => {
-                    const questionCount = questionsContainer.querySelectorAll('.question-item').length;
+            if (addCriterionBtn) {
+                addCriterionBtn.addEventListener('click', () => {
+                    const questionCount = questionsContainer.querySelectorAll('.criterion-item').length;
                     const newQuestionHtml = `
-                        <div class="list-group-item question-item" data-question-idx="${questionCount}" style="border-left: 4px solid #2563eb; margin-bottom: 0.5rem; border-radius: 6px; padding: 1rem;">
+                        <div class="list-group-item criterion-item" data-question-idx="${questionCount}" style="border-left: 4px solid #2563eb; margin-bottom: 0.5rem; border-radius: 6px; padding: 1rem;">
                             <div class="d-flex align-items-start gap-2">
                                 <span class="badge bg-primary" style="margin-top: 4px; flex-shrink: 0;">${questionCount + 1}</span>
                                 <div class="flex-grow-1">
-                                    <textarea class="form-control question-text-input" data-question-id="q${questionCount + 1}" style="min-height: 60px; resize: vertical; font-size: 0.9rem;" placeholder="Enter question text..."></textarea>
-                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-question-btn" style="font-size: 0.75rem;">
+                                    <textarea class="form-control criterion-description-input" data-question-id="q${questionCount + 1}" style="min-height: 60px; resize: vertical; font-size: 0.9rem;" placeholder="Enter question text..."></textarea>
+                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2 remove-criterion-btn" style="font-size: 0.75rem;">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 4px;">
                                             <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
                                             <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
@@ -5806,20 +5806,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                     questionsContainer.insertAdjacentHTML('beforeend', newQuestionHtml);
                     
                     // Update badge numbers
-                    questionsContainer.querySelectorAll('.question-item').forEach((item, idx) => {
+                    questionsContainer.querySelectorAll('.criterion-item').forEach((item, idx) => {
                         item.querySelector('.badge').textContent = idx + 1;
                     });
                     
                     // Attach listeners to new input
-                    const newInput = questionsContainer.querySelector('.question-item:last-child .question-text-input');
+                    const newInput = questionsContainer.querySelector('.criterion-item:last-child .criterion-description-input');
                     newInput.addEventListener('input', checkForChanges);
                     
                     // Attach remove listener
-                    const removeBtn = questionsContainer.querySelector('.question-item:last-child .remove-question-btn');
+                    const removeBtn = questionsContainer.querySelector('.criterion-item:last-child .remove-criterion-btn');
                     removeBtn.addEventListener('click', function() {
-                        this.closest('.question-item').remove();
+                        this.closest('.criterion-item').remove();
                         // Update badge numbers
-                        questionsContainer.querySelectorAll('.question-item').forEach((item, idx) => {
+                        questionsContainer.querySelectorAll('.criterion-item').forEach((item, idx) => {
                             item.querySelector('.badge').textContent = idx + 1;
                         });
                         checkForChanges();
@@ -5830,11 +5830,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             // Remove question handlers
-            questionsContainer.querySelectorAll('.remove-question-btn').forEach(btn => {
+            questionsContainer.querySelectorAll('.remove-criterion-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    this.closest('.question-item').remove();
+                    this.closest('.criterion-item').remove();
                     // Update badge numbers
-                    questionsContainer.querySelectorAll('.question-item').forEach((item, idx) => {
+                    questionsContainer.querySelectorAll('.criterion-item').forEach((item, idx) => {
                         item.querySelector('.badge').textContent = idx + 1;
                     });
                     checkForChanges();
@@ -5844,16 +5844,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Save button handler
             if (saveBtn) {
                 saveBtn.addEventListener('click', async () => {
-                    const questionInputs = questionsContainer.querySelectorAll('.question-text-input');
-                    const questions = Array.from(questionInputs)
+                    const criterionInputs = questionsContainer.querySelectorAll('.criterion-description-input');
+                    const criteria = Array.from(criterionInputs)
                         .map((input, idx) => ({
-                            id: input.dataset.questionId || `q${idx + 1}`,
-                            text: input.value.trim()
+                            id: input.dataset.questionId || `req-${idx + 1}`,
+                            description: input.value.trim(),
                         }))
-                        .filter(q => q.text.length > 0);
+                        .filter(c => c.description.length > 0);
                     
-                    if (questions.length === 0) {
-                        alert('At least one question is required.');
+                    if (criteria.length === 0) {
+                        alert('At least one criterion is required.');
                         return;
                     }
                     
@@ -5861,19 +5861,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                     saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
                     
                     try {
-                        const res = await fetch(`/checklist_review/api/checklists/${encodeURIComponent(checklistName)}`, {
+                        const res = await fetch(`/checklist_review/api/criteria-sets/${encodeURIComponent(checklistName)}`, {
                             method: 'PUT',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({ questions })
+                            body: JSON.stringify({ criteria })
                         });
                         
                         const data = await res.json();
                         
                         if (res.ok) {
-                            // Update original questions to match saved state
-                            originalQuestions = questions;
+                            originalCriteria = criteria;
                             hasChanges = false;
                             saveBtn.style.display = 'none';
                             changesIndicator.style.display = 'none';
@@ -5961,7 +5960,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Load processes
             async function loadProcessesForExtract() {
                 try {
-                    const res = await fetch(`/checklist_review/api/processes?collection_name=${encodeURIComponent(currentCollection)}`);
+                    const res = await fetch(`/checklist_review/api/pipelines?collection_name=${encodeURIComponent(currentCollection)}`);
                     const processes = await res.json();
                     processSelect.innerHTML = '<option value="">Select a process...</option>';
                     processes.forEach(p => {
@@ -5990,28 +5989,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 resultsDiv.innerHTML = '<p class="text-muted">Extracting questions from PDF...</p>';
 
                 try {
-                    const res = await fetch(`/checklist_review/api/checklists/${encodeURIComponent(data.name)}/extract`, {
+                    const res = await fetch(`/checklist_review/api/criteria-sets/${encodeURIComponent(data.name)}/criteria`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            process_name: processSelect.value
-                        })
+                        body: JSON.stringify({}),
                     });
 
                     const result = await res.json();
 
-                    if (res.ok && result.questions && result.questions.length > 0) {
+                    if (res.ok && result.criteria && result.criteria.length > 0) {
                         resultsDiv.innerHTML = `
                                 <div class="mb-2">
                                     <strong>Extracted ${result.count} question(s):</strong>
                                 </div>
                                 <div class="list-group" style="max-height: 300px; overflow-y: auto;">
-                                    ${result.questions.map((q, idx) => `
+                                    ${result.criteria.map((q, idx) => `
                                         <div class="list-group-item" style="border-left: 4px solid #2563eb; margin-bottom: 0.5rem; border-radius: 6px;">
                                             <div class="d-flex align-items-start">
                                                 <span class="badge bg-primary me-2" style="margin-top: 2px;">${idx + 1}</span>
                                                 <div class="flex-grow-1">
-                                                    <strong style="color: #0f172a;">${q.text || 'Question'}</strong>
+                                                    <strong style="color: #0f172a;">${q.description || 'Question'}</strong>
                                                     ${q.id ? `<div class="text-muted small mt-1">ID: ${q.id}</div>` : ''}
                                                 </div>
                                             </div>
@@ -6053,7 +6050,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
 
         const questionsContainer = document.createElement('div');
-        questionsContainer.id = 'createChecklistQuestions';
+        questionsContainer.id = 'createCriteriaSetCriteria';
         questionsContainer.style.marginTop = '1rem';
 
         function addQuestionInput(value = '') {
@@ -6101,7 +6098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         Add Question
                                     </button>
                                 </div>
-                                <div id="createChecklistQuestions"></div>
+                                <div id="createCriteriaSetCriteria"></div>
                                 <p class="text-muted small mt-2">Add binary (yes/no) questions for your checklist.</p>
                             </div>
                         </div>
@@ -6115,14 +6112,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
         document.body.appendChild(modal);
-        modal.querySelector('#createChecklistQuestions').appendChild(questionsContainer);
+        modal.querySelector('#createCriteriaSetCriteria').appendChild(questionsContainer);
 
         // Add initial question input
         addQuestionInput();
 
         // Make addQuestionInput available globally for the button
         window.addQuestionInput = () => {
-            const container = document.getElementById('createChecklistQuestions');
+            const container = document.getElementById('createCriteriaSetCriteria');
             const questionDiv = document.createElement('div');
             questionDiv.className = 'mb-2';
             questionDiv.style.display = 'flex';
@@ -6150,30 +6147,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            const questionInputs = modal.querySelectorAll('#createChecklistQuestions input[type="text"]');
-            const questions = Array.from(questionInputs)
-                .map(input => input.value.trim())
-                .filter(q => q.length > 0);
+            const criterionInputs = modal.querySelectorAll('#createCriteriaSetCriteria input[type="text"]');
+            const criteria = Array.from(criterionInputs)
+                .map((input, idx) => ({
+                    id: `req-${idx + 1}`,
+                    description: input.value.trim(),
+                }))
+                .filter(c => c.description.length > 0);
 
-            if (questions.length === 0) {
-                alert('Please add at least one question.');
+            if (criteria.length === 0) {
+                alert('Please add at least one criterion.');
                 return;
             }
 
             try {
-                const res = await fetch('/checklist_review/api/checklists/create', {
+                const res = await fetch('/checklist_review/api/criteria-sets/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: checklistName,
-                        questions: questions
+                        criteria,
                     })
                 });
 
                 const data = await res.json();
 
                 if (res.ok) {
-                    log(`Checklist "${checklistName}" created successfully with ${questions.length} question(s).`);
+                    log(`Criteria set "${checklistName}" created successfully with ${criteria.length} criterion(s).`);
                     modal.remove();
                     await loadChecklists();
                     // Select the newly created checklist

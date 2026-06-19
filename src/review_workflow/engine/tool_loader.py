@@ -11,7 +11,7 @@ from src.review_workflow.engine.base import BaseComponent
 
 logger = logging.getLogger("ToolLoader")
 
-# Path to evaluator components (tools + question_reviewer live here; tools are filtered by metadata)
+# Path to evaluator components (tools + criterion_evaluator live here; tools are filtered by metadata)
 REVIEW_COMPONENTS_DIR = Path(__file__).resolve().parent.parent / "components" / "evaluators"
 
 
@@ -33,8 +33,8 @@ def discover_review_tools() -> Dict[str, Dict[str, Any]]:
         if not component_dir.is_dir():
             continue
         
-        # Skip question_reviewer as it's not a tool
-        if component_dir.name == "question_reviewer":
+        # Skip criterion_evaluator as it's not a tool
+        if component_dir.name == "criterion_evaluator":
             continue
         
         metadata_path = component_dir / "metadata.json"
@@ -181,21 +181,21 @@ def get_tool_as_tool_function(tool_id: str, tool_config: Dict[str, Any],
         return None
     
     try:
-        # All tools now have a consistent signature: as_tool(collection_name, review_process_name, checklist_name, paper_name, log_callback=None)
+        # All tools now have a consistent signature: as_tool(collection_name, pipeline_name, criteria_set_name, artifact_name, log_callback=None)
         # If context is provided, extract the standard parameters
         if context:
             collection_name = context.get("collection_name")
-            review_process_name = context.get("review_process_name")
-            checklist_name = context.get("checklist_name")
-            paper_name = context.get("paper_name")
+            pipeline_name = context.get("pipeline_name")
+            criteria_set_name = context.get("criteria_set_name")
+            artifact_name = context.get("artifact_name")
             log_callback = context.get("log_callback")
             
             # Check if required parameters are present
-            if not all([collection_name, review_process_name, paper_name]):
+            if not all([collection_name, pipeline_name, artifact_name]):
                 missing = [k for k, v in {
                     "collection_name": collection_name,
-                    "review_process_name": review_process_name,
-                    "paper_name": paper_name
+                    "pipeline_name": pipeline_name,
+                    "artifact_name": artifact_name
                 }.items() if not v]
                 error_msg = f"Tool {tool_id} requires context parameters that are missing: {missing}. Available context keys: {list(context.keys())}"
                 logger.error(error_msg)
@@ -207,9 +207,9 @@ def get_tool_as_tool_function(tool_id: str, tool_config: Dict[str, Any],
             collections_root = context.get("collections_root")
             return tool_instance.as_tool(
                 collection_name=collection_name,
-                review_process_name=review_process_name,
-                checklist_name=checklist_name or "",
-                paper_name=paper_name,
+                pipeline_name=pipeline_name,
+                criteria_set_name=criteria_set_name or "",
+                artifact_name=artifact_name,
                 log_callback=log_callback,
                 token_usage_accumulator=token_usage_accumulator,
                 collections_root=collections_root,

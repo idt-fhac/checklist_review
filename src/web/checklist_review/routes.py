@@ -16,58 +16,39 @@ from src.web.checklist_review import services
 from src.core import storage
 from src.core.task_manager import TaskManager, TaskStatus
 from src.core import task_persistence
-from src.review_workflow.engine.components import list_components_metadata, get_component_metadata
 from src.review_workflow.engine.review_process import ReviewProcess
-from src.review_workflow.engine.tool_loader import discover_review_tools
 from src.review_workflow.engine.pipeline_loader import build_review_process_definition
 
 checklist_review_bp = Blueprint("checklist_review", __name__, url_prefix="/checklist_review", template_folder="templates")
 logger = logging.getLogger(__name__)
 
 
-def _resolve_review_process_definition(
-    pipeline_id: str | None,
-    process_data: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
-    """Load a ReviewProcess definition from config pipeline id."""
-    if pipeline_id:
-        return build_review_process_definition(pipeline_id)
-    if process_data and (process_data.get("nodes") or process_data.get("stages")):
-        steps = _convert_flow_to_steps(process_data)
-        legacy_name = process_data.get("name") or "legacy_process"
-        review_process_def = {
-            "name": legacy_name,
-            "config": {"separate_criteria": True},
-            "artifact_loader": {},
-            "paper_loader": {},
-            "criterion_evaluator": {},
-            "question_reviewer": {},
-            "post_processors": [],
-        }
-        available_tools = discover_review_tools()
-        tool_ids = set(available_tools.keys())
-        tools_map = {}
-        for step in steps:
-            comp_id = step.get("component_id")
-            if comp_id in tool_ids:
-                tools_map[step["id"]] = {comp_id: step.get("config", {})}
-        for step in steps:
-            comp_id = step.get("component_id")
-            config = step.get("config", {})
-            if comp_id == "paper_loader":
-                review_process_def["artifact_loader"] = {"config": config}
-                review_process_def["paper_loader"] = {"config": config}
-            elif comp_id == "question_reviewer":
-                if "tools" not in config:
-                    config["tools"] = []
-                for tool_cfg in tools_map.values():
-                    config["tools"].append(tool_cfg)
-                review_process_def["criterion_evaluator"] = {"config": config}
-                review_process_def["question_reviewer"] = {"config": config}
-            elif comp_id in ("md_writer", "pdf_writer", "json_writer"):
-                review_process_def["post_processors"].append({"id": comp_id, "config": config})
-        return review_process_def
-    raise ValueError("pipeline_id (process_name) is required; pipelines are defined in config/pipelines/")
+def _normalize_criteria_input(raw_items: List[Any]) -> List[Dict[str, Any]]:
+    from src.core.criteria import normalize_criterion
+
+    criteria: List[Dict[str, Any]] = []
+    for i, item in enumerate(raw_items):
+        if isinstance(item, str):
+            criteria.append(normalize_criterion(item, i))
+            continue
+        if isinstance(item, dict):
+            description = item.get("description") or item.get("text") or item.get("question") or ""
+            criteria.append(
+                normalize_criterion(
+                    {"id": item.get("id"), "description": description, **{k: v for k, v in item.items() if k not in ("text", "question")}},
+                    i,
+                )
+            )
+    return [c for c in criteria if c.get("description")]
+
+
+def _write_criteria_set_file(path: Path, name: str, criteria: List[Dict[str, Any]], **extra: Any) -> Dict[str, Any]:
+    from src.core.criteria import load_criteria_set
+
+    payload = {"name": name, "criteria": criteria, **extra}
+    criteria_set = load_criteria_set(payload, name=name)
+    path.write_text(json.dumps(criteria_set, indent=2), encoding="utf-8")
+    return criteria_set
 
 
 @checklist_review_bp.route("/static/<path:filename>")
@@ -109,12 +90,12 @@ def index():
         try:
             if form_id == "checklist_form":
                 collection_choice = request.form.get("collection_choice", "")
-                raw_paper_ids = request.form.get("paper_ids", "")
+                raw_artifact_ids = request.form.get("artifact_ids", "")
                 prompt = request.form.get("prompt", "")
-                paper_ids = services.parse_paper_list(raw_paper_ids)
+                artifact_ids = services.parse_paper_list(raw_artifact_ids)
                 
                 collection_payload = storage.load_collection(collections_root, collection_choice) if collection_choice else None
-                entries = services.generate_checklist(collection_choice, paper_ids, prompt, collection_payload)
+                entries = services.generate_checklist(collection_choice, artifact_ids, prompt, collection_payload)
                 saved_path = storage.save_checklist(collections_root, collection_choice or "adhoc", entries)
                 
                 context["checklist_result"] = {
@@ -128,8 +109,8 @@ def index():
     return render_template("checklist_review/index.html", **context)
 
 
-@checklist_review_bp.get("/api/papers")
-def api_list_papers():
+@checklist_review_bp.get("/api/artifacts")
+def api_list_artifacts():
     collection_name = request.args.get("collection_name")
     if not collection_name:
         return jsonify([])
@@ -139,17 +120,17 @@ def api_list_papers():
     return jsonify(papers)
 
 
-@checklist_review_bp.get("/api/paper-details")
-def api_get_paper_details():
+@checklist_review_bp.get("/api/artifact-details")
+def api_get_artifact_details():
     collection_name = request.args.get("collection_name")
-    paper_id = request.args.get("paper_id")
+    artifact_id = request.args.get("artifact_id")
     
-    if not collection_name or not paper_id:
-        return jsonify({"error": "Missing collection_name or paper_id"}), 400
+    if not collection_name or not artifact_id:
+        return jsonify({"error": "Missing collection_name or artifact_id"}), 400
     
     collections_root = get_collections_dir()
     collection_dir = storage._collection_dir(collections_root, collection_name, create=False)
-    paper_stem = Path(paper_id).stem
+    paper_stem = Path(artifact_id).stem
     meta_dir = storage._source_metadata_dir(collection_dir, create=False)
     json_path = meta_dir / f"{paper_stem}.json" if meta_dir.exists() else None
     if not json_path or not json_path.exists():
@@ -159,12 +140,12 @@ def api_get_paper_details():
             with json_path.open("r", encoding="utf-8") as f:
                 metadata = json.load(f)
                 return jsonify({
-                    "title": metadata.get("title", paper_id),
+                    "title": metadata.get("title", artifact_id),
                     "abstract": metadata.get("abstract", ""),
                     "summary": metadata.get("abstract", ""),  # Alias for compatibility
                     "authors": metadata.get("authors", []),
-                    "paper_id": paper_id,
-                    "filename": paper_id + ".pdf"  # Best guess
+                    "artifact_id": artifact_id,
+                    "filename": artifact_id + ".pdf"  # Best guess
                 })
         except Exception as e:
             logger.error(f"Error reading paper metadata: {e}")
@@ -172,17 +153,17 @@ def api_get_paper_details():
     
     # If metadata not found, return basic info
     return jsonify({
-        "title": paper_id,
+        "title": artifact_id,
         "abstract": "",
         "summary": "",
         "authors": [],
-        "paper_id": paper_id,
-        "filename": paper_id + ".pdf"
+        "artifact_id": artifact_id,
+        "filename": artifact_id + ".pdf"
     })
 
 
-@checklist_review_bp.delete("/api/papers/<paper_id>")
-def api_delete_paper(paper_id: str):
+@checklist_review_bp.delete("/api/artifacts/<artifact_id>")
+def api_delete_artifact(artifact_id: str):
     collection_name = request.args.get("collection_name")
     if not collection_name:
         return jsonify({"error": "Missing collection_name"}), 400
@@ -190,45 +171,45 @@ def api_delete_paper(paper_id: str):
     collections_root = get_collections_dir()
     collection_dir = storage._collection_dir(collections_root, collection_name, create=False)
     
-    # Normalize paper_id (remove .pdf extension if present for matching)
-    paper_id_stem = Path(paper_id).stem
+    # Normalize artifact_id (remove .pdf extension if present for matching)
+    artifact_id_stem = Path(artifact_id).stem
     
     # Load selected list to find the paper
     selected_files = storage.load_selected_list(collections_root, collection_name)
     paper_entry = None
     
-    # Try to find paper by paper_id, filename (with or without .pdf), or title
+    # Try to find paper by artifact_id, filename (with or without .pdf), or title
     for entry in selected_files:
-        entry_paper_id = entry.get("paper_id", "")
+        entry_artifact_id = entry.get("artifact_id", "")
         entry_filename = entry.get("filename", "")
         entry_title = entry.get("title", "")
         
         # Normalize entry filename stem for comparison
         entry_filename_stem = Path(entry_filename).stem if entry_filename else ""
         
-        if (entry_paper_id == paper_id or 
-            entry_paper_id == paper_id_stem or
-            entry_filename == paper_id or
-            entry_filename_stem == paper_id_stem or
-            entry_title == paper_id):
+        if (entry_artifact_id == artifact_id or 
+            entry_artifact_id == artifact_id_stem or
+            entry_filename == artifact_id or
+            entry_filename_stem == artifact_id_stem or
+            entry_title == artifact_id):
             paper_entry = entry
             break
     
     if not paper_entry:
         # Also try remove_paper in case it's in the collection.json
         # Try both with and without .pdf extension
-        success = storage.remove_paper(collections_root, collection_name, paper_id)
-        if not success and paper_id_stem != paper_id:
-            success = storage.remove_paper(collections_root, collection_name, paper_id_stem)
+        success = storage.remove_paper(collections_root, collection_name, artifact_id)
+        if not success and artifact_id_stem != artifact_id:
+            success = storage.remove_paper(collections_root, collection_name, artifact_id_stem)
         if not success:
             return jsonify({"error": "Paper not found or unable to delete."}), 404
-        return jsonify({"message": f"Paper '{paper_id}' removed from collection."})
+        return jsonify({"message": f"Paper '{artifact_id}' removed from collection."})
     
     # Get filename for deletion
     filename = paper_entry.get("filename")
     if not filename:
-        # Try to construct from paper_id
-        filename = paper_entry.get("paper_id", paper_id)
+        # Try to construct from artifact_id
+        filename = paper_entry.get("artifact_id", artifact_id)
         if not filename.endswith('.pdf'):
             filename = f"{filename}.pdf"
     
@@ -263,14 +244,14 @@ def api_delete_paper(paper_id: str):
                     logger.warning(f"Failed to delete {f}: {e}")
     
     # Remove from selected list - match by all possible identifiers
-    entry_paper_id = paper_entry.get("paper_id", "")
+    entry_artifact_id = paper_entry.get("artifact_id", "")
     entry_filename = paper_entry.get("filename", "")
     entry_title = paper_entry.get("title", "")
     
     updated_selected = [
         entry for entry in selected_files
         if not (
-            (entry.get("paper_id") == entry_paper_id and entry_paper_id) or
+            (entry.get("artifact_id") == entry_artifact_id and entry_artifact_id) or
             (entry.get("filename") == entry_filename and entry_filename) or
             (entry.get("title") == entry_title and entry_title)
         )
@@ -282,17 +263,17 @@ def api_delete_paper(paper_id: str):
     
     # Also try to remove from collection.json if it exists there
     try:
-        storage.remove_paper(collections_root, collection_name, paper_id)
-        if paper_id_stem != paper_id:
-            storage.remove_paper(collections_root, collection_name, paper_id_stem)
+        storage.remove_paper(collections_root, collection_name, artifact_id)
+        if artifact_id_stem != artifact_id:
+            storage.remove_paper(collections_root, collection_name, artifact_id_stem)
     except Exception:
         pass  # Ignore if not in collection.json
     
-    return jsonify({"message": f"Paper '{paper_id}' removed from collection."})
+    return jsonify({"message": f"Paper '{artifact_id}' removed from collection."})
 
 
-@checklist_review_bp.post("/api/papers/upload")
-def api_upload_paper():
+@checklist_review_bp.post("/api/artifacts/upload")
+def api_upload_artifact():
     files = request.files.getlist("files")
     if not files:
         return jsonify({"error": "No files uploaded."}), 400
@@ -416,7 +397,7 @@ def api_upload_paper():
                 current_list = storage.load_selected_list(collections_root, collection_name)
                 for pdf_path in pdf_files:
                     pdf_stem = pdf_path.stem
-                    exists = any(p.get("filename") == pdf_path.name or p.get("paper_id") == pdf_stem for p in current_list)
+                    exists = any(p.get("filename") == pdf_path.name or p.get("artifact_id") == pdf_stem for p in current_list)
                     if not exists:
                         # Try to load metadata for title
                         json_path = meta_dir / f"{pdf_stem}.json"
@@ -430,7 +411,7 @@ def api_upload_paper():
                         
                         current_list.append({
                             "filename": pdf_path.name,
-                            "paper_id": pdf_stem,
+                            "artifact_id": pdf_stem,
                             "title": title
                         })
                 storage.save_selected_list(collections_root, collection_name, current_list)
@@ -467,7 +448,7 @@ def api_list_providers():
     return jsonify(SettingsManager.list_providers_for_api())
 
 
-@checklist_review_bp.post("/api/simulate-checklist")
+@checklist_review_bp.post("/api/simulate-criteria-set")
 def simulate_checklist():
     payload = request.get_json(silent=True) or {}
     items = payload.get("items")
@@ -475,41 +456,38 @@ def simulate_checklist():
         return jsonify({"error": "Items are required."}), 400
 
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
+    from src.core.storage import _criteria_sets_dir
+    checklist_dir = _criteria_sets_dir(base_dir)
     checklist_dir.mkdir(parents=True, exist_ok=True)
 
     generated_files: List[str] = []
     
-    def random_questions(count: int = 3):
-        return [{"question": f"Q{i}", "references": []} for i in range(count)]
+    def random_criteria(count: int = 3):
+        return [{"id": f"req-{i+1}", "description": f"Criterion {i+1}"} for i in range(count)]
 
     for entry in items:
-        filename = entry.get("filename") or entry.get("paper_id") or entry.get("title")
+        filename = entry.get("filename") or entry.get("artifact_id") or entry.get("title")
         if not filename:
             continue
         target = checklist_dir / f"{Path(filename).name}.json"
-        with target.open("w", encoding="utf-8") as fh:
-            json.dump(
-                {
-                    "paper_id": entry.get("paper_id"),
-                    "title": entry.get("title"),
-                    "generated_at": datetime.utcnow().isoformat(),
-                    "questions": random_questions(),
-                },
-                fh,
-                indent=2,
-            )
+        _write_criteria_set_file(
+            target,
+            Path(filename).stem,
+            random_criteria(),
+            generated_at=datetime.utcnow().isoformat(),
+            artifact_id=entry.get("artifact_id"),
+            title=entry.get("title"),
+        )
         generated_files.append(str(target))
 
-    return jsonify({"message": f"Simulated checklist saved ({len(generated_files)} files)."})
+    return jsonify({"message": f"Simulated criteria set saved ({len(generated_files)} files)."})
 
 
-@checklist_review_bp.get("/api/checklists")
-def api_list_checklists():
+@checklist_review_bp.get("/api/criteria-sets")
+def api_list_criteria_sets():
     """List all checklists from workspaces/guest/checklists (global, not per collection)"""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    all_checklists = storage.list_checklists(base_dir)
+    all_checklists = storage.list_criteria_sets(base_dir)
     # Sort by creation date (newest first)
     all_checklists.sort(key=lambda x: x.get("created_at") if isinstance(x.get("created_at"), datetime) else datetime(1970, 1, 1), reverse=True)
     return jsonify(all_checklists)
@@ -519,7 +497,7 @@ def _sse_message(event: str, payload: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload)}\n\n"
 
 
-@checklist_review_bp.post("/api/checklists/upload")
+@checklist_review_bp.post("/api/criteria-sets/upload")
 def api_upload_checklist():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -528,14 +506,14 @@ def api_upload_checklist():
         return jsonify({"error": "No selected file"}), 400
     
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
+    from src.core.storage import _criteria_sets_dir
     from src.core.pdf_processing import (
         extract_checklist_questions_from_pdf,
         get_checklist_extraction_llm_provider,
         PDFProcessingError,
     )
     
-    checklist_dir = _checklists_dir(base_dir)
+    checklist_dir = _criteria_sets_dir(base_dir)
     checklist_dir.mkdir(parents=True, exist_ok=True)
     
     filename = file.filename
@@ -588,25 +566,23 @@ def api_upload_checklist():
                         "filename": filename
                     })
                     
-                    questions = extract_checklist_questions_from_pdf(pdf_path, provider_config)
+                    extracted = extract_checklist_questions_from_pdf(pdf_path, provider_config)
+                    criteria = _normalize_criteria_input(extracted)
                     
                     yield _sse_message("progress", {
                         "stage": "extraction",
                         "progress": 80,
-                        "message": f"Extracted {len(questions)} questions",
+                        "message": f"Extracted {len(criteria)} criteria",
                         "filename": filename
                     })
                     
-                    # Save extracted questions as JSON (only JSON, no PDF)
                     json_path = checklist_dir / f"{file_stem}.json"
-                    checklist_data = {
-                        "name": file_stem,
-                        "created_at": datetime.utcnow().isoformat(),
-                        "questions": questions,
-                        "source": "extracted_from_pdf"
-                    }
-                    with json_path.open("w", encoding="utf-8") as f:
-                        json.dump(checklist_data, f, indent=2)
+                    _write_criteria_set_file(
+                        json_path,
+                        file_stem,
+                        criteria,
+                        source="extracted_from_pdf",
+                    )
                     
                     # Delete temporary PDF file
                     try:
@@ -624,8 +600,8 @@ def api_upload_checklist():
                     
                     yield _sse_message("complete", {
                         "filename": filename,
-                        "questions_extracted": len(questions),
-                        "message": "Checklist uploaded and questions extracted successfully"
+                        "criteria_extracted": len(criteria),
+                        "message": "Criteria set uploaded and criteria extracted successfully"
                     })
                 else:
                     # Delete temporary PDF and return error
@@ -679,50 +655,34 @@ def api_upload_checklist():
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
-@checklist_review_bp.get("/api/checklists/<checklist_name>/view")
-def api_view_checklist(checklist_name):
-    """View a checklist from workspaces/guest/checklists (global, not per collection)"""
+@checklist_review_bp.get("/api/criteria-sets/<criteria_set_name>/view")
+def api_view_criteria_set(criteria_set_name):
+    """View a criteria set from the active workspace."""
+    from src.core.criteria import load_criteria_set
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
-    
-    json_file = checklist_dir / f"{checklist_name}.json"
-    
-    if json_file.exists():
-        try:
-            with json_file.open(encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, list):
-                questions = data
-            elif isinstance(data, dict) and "questions" in data:
-                questions = data["questions"]
-            elif isinstance(data, dict) and "items" in data:
-                questions = data["items"]
-            else:
-                questions = []
-            
-            normalized_questions = []
-            for q in questions:
-                if isinstance(q, dict):
-                    normalized_questions.append({
-                        "id": q.get("id", ""),
-                        "text": q.get("text", q.get("question", str(q)))
-                    })
-            
-            return jsonify({
-                "type": "json",
-                "name": checklist_name,
-                "questions": normalized_questions
-            })
-        except Exception as e:
-            logger.error(f"Error reading checklist JSON: {e}")
-            return jsonify({"error": f"Failed to read checklist: {str(e)}"}), 500
-    
-    return jsonify({"error": "Checklist not found"}), 404
+    from src.core.storage import _criteria_sets_dir
+    criteria_dir = _criteria_sets_dir(base_dir)
+    json_file = criteria_dir / f"{criteria_set_name}.json"
+
+    if not json_file.exists():
+        return jsonify({"error": "Criteria set not found"}), 404
+
+    try:
+        payload = json.loads(json_file.read_text(encoding="utf-8"))
+        criteria_set = load_criteria_set(payload, name=criteria_set_name)
+        return jsonify({
+            "type": "json",
+            "name": criteria_set_name,
+            "criteria": criteria_set.get("criteria", []),
+        })
+    except Exception as e:
+        logger.error(f"Error reading criteria set JSON: {e}")
+        return jsonify({"error": f"Failed to read criteria set: {str(e)}"}), 500
 
 
-@checklist_review_bp.post("/api/checklists/<checklist_name>/rename")
-def api_rename_checklist(checklist_name):
+@checklist_review_bp.post("/api/criteria-sets/<criteria_set_name>/rename")
+def api_rename_checklist(criteria_set_name):
     """Rename a checklist in workspaces/guest/checklists (global, not per collection)"""
     data = request.get_json()
     new_name = data.get("new_name")
@@ -731,10 +691,10 @@ def api_rename_checklist(checklist_name):
         return jsonify({"error": "Missing new_name"}), 400
     
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
+    from src.core.storage import _criteria_sets_dir
+    checklist_dir = _criteria_sets_dir(base_dir)
     
-    json_file = checklist_dir / f"{checklist_name}.json"
+    json_file = checklist_dir / f"{criteria_set_name}.json"
     new_json_file = checklist_dir / f"{new_name}.json"
     
     if not json_file.exists():
@@ -748,7 +708,7 @@ def api_rename_checklist(checklist_name):
         
         # Rename checklist folders in all collections
         collections_root = get_collections_dir()
-        folder_result = storage.rename_checklist_folders(collections_root, checklist_name, new_name)
+        folder_result = storage.rename_checklist_folders(collections_root, criteria_set_name, new_name)
         
         if folder_result["errors"]:
             logger.warning(f"Some checklist folders could not be renamed: {folder_result['errors']}")
@@ -765,14 +725,14 @@ def api_rename_checklist(checklist_name):
         return jsonify({"error": f"Failed to rename checklist: {str(e)}"}), 500
 
 
-@checklist_review_bp.delete("/api/checklists/<checklist_name>")
-def api_delete_checklist(checklist_name):
+@checklist_review_bp.delete("/api/criteria-sets/<criteria_set_name>")
+def api_delete_checklist(criteria_set_name):
     """Delete a checklist from workspaces/guest/checklists (global, not per collection)"""
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
+    from src.core.storage import _criteria_sets_dir
+    checklist_dir = _criteria_sets_dir(base_dir)
     
-    json_file = checklist_dir / f"{checklist_name}.json"
+    json_file = checklist_dir / f"{criteria_set_name}.json"
     
     if not json_file.exists():
         return jsonify({"error": "Checklist not found"}), 404
@@ -782,7 +742,7 @@ def api_delete_checklist(checklist_name):
         
         # Delete checklist folders in all collections
         collections_root = get_collections_dir()
-        folder_result = storage.delete_checklist_folders(collections_root, checklist_name)
+        folder_result = storage.delete_checklist_folders(collections_root, criteria_set_name)
         
         if folder_result["errors"]:
             logger.warning(f"Some checklist folders could not be deleted: {folder_result['errors']}")
@@ -799,185 +759,83 @@ def api_delete_checklist(checklist_name):
         return jsonify({"error": f"Failed to delete checklist: {str(e)}"}), 500
 
 
-@checklist_review_bp.post("/api/checklists/create")
-def api_create_checklist():
-    """Create a checklist in workspaces/guest/checklists (global, not per collection)"""
+@checklist_review_bp.post("/api/criteria-sets/create")
+def api_create_criteria_set():
+    """Create a criteria set in the active workspace."""
     data = request.get_json()
-    checklist_name = data.get("name")
-    questions = data.get("questions", [])
-    
-    if not checklist_name:
+    criteria_set_name = data.get("name")
+    raw_criteria = data.get("criteria", [])
+
+    if not criteria_set_name:
         return jsonify({"error": "Missing name"}), 400
-    
-    if not questions:
-        return jsonify({"error": "At least one question is required"}), 400
-    
+
+    criteria = _normalize_criteria_input(raw_criteria)
+    if not criteria:
+        return jsonify({"error": "At least one criterion is required"}), 400
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
-    checklist_dir.mkdir(parents=True, exist_ok=True)
-    
-    json_file = checklist_dir / f"{checklist_name}.json"
-    
+    from src.core.storage import _criteria_sets_dir
+    criteria_dir = _criteria_sets_dir(base_dir)
+    criteria_dir.mkdir(parents=True, exist_ok=True)
+
+    json_file = criteria_dir / f"{criteria_set_name}.json"
     if json_file.exists():
-        return jsonify({"error": "A checklist with this name already exists"}), 400
-    
-    normalized_questions = []
-    for i, q in enumerate(questions):
-        if isinstance(q, str):
-            normalized_questions.append({
-                "id": f"q{i+1}",
-                "text": q
-            })
-        elif isinstance(q, dict):
-            normalized_questions.append({
-                "id": q.get("id", f"q{i+1}"),
-                "text": q.get("text", q.get("question", ""))
-            })
-    
-    checklist_data = {
-        "name": checklist_name,
-        "created_at": datetime.utcnow().isoformat(),
-        "questions": normalized_questions
-    }
-    
+        return jsonify({"error": "A criteria set with this name already exists"}), 400
+
     try:
-        with json_file.open("w", encoding="utf-8") as f:
-            json.dump(checklist_data, f, indent=2)
-        return jsonify({"message": "Checklist created successfully", "name": checklist_name})
+        _write_criteria_set_file(json_file, criteria_set_name, criteria)
+        return jsonify({"message": "Criteria set created successfully", "name": criteria_set_name})
     except Exception as e:
-        logger.error(f"Error creating checklist: {e}")
-        return jsonify({"error": f"Failed to create checklist: {str(e)}"}), 500
+        logger.error(f"Error creating criteria set: {e}")
+        return jsonify({"error": f"Failed to create criteria set: {str(e)}"}), 500
 
 
-@checklist_review_bp.put("/api/checklists/<checklist_name>")
-def api_update_checklist(checklist_name):
-    """Update a checklist in workspaces/guest/checklists (global, not per collection)"""
+@checklist_review_bp.put("/api/criteria-sets/<criteria_set_name>")
+def api_update_criteria_set(criteria_set_name):
+    """Update a criteria set in the active workspace."""
     data = request.get_json()
-    questions = data.get("questions", [])
-    
-    if not questions:
-        return jsonify({"error": "At least one question is required"}), 400
-    
+    raw_criteria = data.get("criteria", [])
+
+    criteria = _normalize_criteria_input(raw_criteria)
+    if not criteria:
+        return jsonify({"error": "At least one criterion is required"}), 400
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    from src.core.storage import _checklists_dir
-    checklist_dir = _checklists_dir(base_dir)
-    
-    json_file = checklist_dir / f"{checklist_name}.json"
-    
+    from src.core.storage import _criteria_sets_dir
+    criteria_dir = _criteria_sets_dir(base_dir)
+    json_file = criteria_dir / f"{criteria_set_name}.json"
+
     if not json_file.exists():
-        return jsonify({"error": "Checklist not found"}), 404
-    
+        return jsonify({"error": "Criteria set not found"}), 404
+
     try:
-        # Load existing checklist: preserve top-level keys (name, created_at, source, …) and
-        # support legacy files whose root JSON is a bare list of questions.
-        with json_file.open("r", encoding="utf-8") as f:
-            existing_raw = json.load(f)
-
-        if isinstance(existing_raw, list):
-            existing_data: Dict[str, Any] = {
-                "name": checklist_name,
-                "created_at": datetime.utcnow().isoformat(),
-            }
-        elif isinstance(existing_raw, dict):
-            existing_data = dict(existing_raw)
-        else:
-            existing_data = {
-                "name": checklist_name,
-                "created_at": datetime.utcnow().isoformat(),
-            }
-
-        normalized_questions = []
-        for i, q in enumerate(questions):
-            if isinstance(q, str):
-                normalized_questions.append({
-                    "id": f"q{i+1}",
-                    "text": q
-                })
-            elif isinstance(q, dict):
-                normalized_questions.append({
-                    "id": q.get("id", f"q{i+1}"),
-                    "text": q.get("text", q.get("question", ""))
-                })
-
-        checklist_data = dict(existing_data)
-        checklist_data["name"] = existing_data.get("name", checklist_name)
-        checklist_data["created_at"] = existing_data.get("created_at", datetime.utcnow().isoformat())
-        checklist_data["questions"] = normalized_questions
-
-        with json_file.open("w", encoding="utf-8") as f:
-            json.dump(checklist_data, f, indent=2)
-        return jsonify({"message": "Checklist updated successfully", "name": checklist_name})
+        existing_raw = json.loads(json_file.read_text(encoding="utf-8"))
+        extra = {}
+        if isinstance(existing_raw, dict):
+            for key in ("source", "generated_at"):
+                if existing_raw.get(key) is not None:
+                    extra[key] = existing_raw[key]
+        _write_criteria_set_file(json_file, criteria_set_name, criteria, **extra)
+        return jsonify({"message": "Criteria set updated successfully", "name": criteria_set_name})
     except Exception as e:
-        logger.error(f"Error updating checklist: {e}")
-        return jsonify({"error": f"Failed to update checklist: {str(e)}"}), 500
+        logger.error(f"Error updating criteria set: {e}")
+        return jsonify({"error": f"Failed to update criteria set: {str(e)}"}), 500
 
 
-@checklist_review_bp.post("/api/checklists/<checklist_name>/extract")
-def api_extract_checklist(checklist_name):
-    """Extract questions from a checklist in workspaces/guest/checklists (global, not per collection)"""
-    data = request.get_json()
-    process_name = data.get("process_name")
-    
-    if not process_name:
-        return jsonify({"error": "Missing process_name"}), 400
-    
-    # Process definitions are now global
+@checklist_review_bp.post("/api/criteria-sets/<criteria_set_name>/criteria")
+def api_get_criteria_set_criteria(criteria_set_name):
+    """Return criteria from a criteria set JSON file."""
+    from src.core.criteria import criteria_for_evaluator, load_criteria_set
+    from src.core.storage import _criteria_sets_dir
+
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    process_data = storage.load_global_process(base_dir, process_name)
-    if not process_data:
-        return jsonify({"error": "Process not found"}), 404
-    
-    try:
-        steps = _convert_flow_to_steps(process_data)
-        
-        # Load checklist directly from workspaces/guest/checklists directory
-        from src.core.storage import _checklists_dir
-        checklist_dir = _checklists_dir(base_dir)
-        checklist_json_path = checklist_dir / f"{checklist_name}.json"
-        
-        if not checklist_json_path.exists():
-            return jsonify({"error": f"Checklist '{checklist_name}' not found. Please upload it first."}), 404
-        
-        try:
-            with checklist_json_path.open(encoding="utf-8") as f:
-                checklist_data = json.load(f)
-            
-            # Extract questions from the JSON structure
-            questions = []
-            if isinstance(checklist_data, dict):
-                if "questions" in checklist_data:
-                    questions = checklist_data["questions"]
-                elif "content" in checklist_data:
-                    questions = checklist_data["content"]
-                elif "items" in checklist_data:
-                    questions = checklist_data["items"]
-            elif isinstance(checklist_data, list):
-                questions = checklist_data
-            
-            normalized_questions = []
-            for q in questions:
-                if isinstance(q, dict) and q.get("text"):
-                    normalized_questions.append({
-                        "id": q.get("id", ""),
-                        "text": q.get("text")
-                    })
-            
-            if normalized_questions:
-                return jsonify({
-                    "questions": normalized_questions,
-                    "count": len(normalized_questions)
-                })
-            else:
-                return jsonify({"error": "No questions found in the checklist JSON file"}), 500
-                
-        except Exception as e:
-            logger.error(f"Error reading checklist JSON: {e}", exc_info=True)
-            return jsonify({"error": f"Failed to read checklist: {str(e)}"}), 500
-        
-    except Exception as e:
-        logger.error(f"Error extracting checklist: {e}", exc_info=True)
-        return jsonify({"error": f"Failed to extract questions: {str(e)}"}), 500
+    criteria_path = _criteria_sets_dir(base_dir) / f"{criteria_set_name}.json"
+    if not criteria_path.exists():
+        return jsonify({"error": f"Criteria set '{criteria_set_name}' not found"}), 404
+    payload = json.loads(criteria_path.read_text(encoding="utf-8"))
+    criteria_set = load_criteria_set(payload, name=criteria_set_name)
+    criteria = criteria_for_evaluator(criteria_set)
+    return jsonify({"criteria": criteria, "count": len(criteria)})
 
 
 @checklist_review_bp.get("/api/pipelines")
@@ -987,123 +845,42 @@ def api_list_pipelines():
     return jsonify(list_pipelines())
 
 
-@checklist_review_bp.get("/api/processes")
-def api_list_processes():
-    """List config-backed pipelines (legacy /api/processes alias)."""
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    procs = storage.list_global_processes(base_dir)
-    return jsonify(procs)
-
-
-@checklist_review_bp.get("/api/processes/<process_name>")
-def api_get_process(process_name):
-    """Get a globally available process definition"""
-    base_dir = Path(__file__).resolve().parent.parent.parent.parent
-    data = storage.load_global_process(base_dir, process_name)
-    if data:
-        return jsonify(data)
-    return jsonify({"error": "Process not found"}), 404
-
-
-@checklist_review_bp.post("/api/processes")
-def api_save_process():
-    return jsonify({
-        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be modified from the UI."
-    }), 405
-
-
-@checklist_review_bp.delete("/api/processes/<process_name>")
-def api_delete_process(process_name):
-    return jsonify({
-        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be deleted from the UI."
-    }), 405
-
-
-@checklist_review_bp.post("/api/processes/<process_name>/rename")
-def api_rename_process(process_name):
-    return jsonify({
-        "error": "Pipelines are defined in config/pipelines/*.yaml and cannot be renamed from the UI."
-    }), 405
-
-
-
-def _convert_flow_to_steps(flow_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    nodes = flow_data.get("nodes", [])
-    if isinstance(nodes, dict):
-        nodes = []
-        
-    steps = []
-    node_list = []
-    for node in nodes:
-        data = node.get("data", {})
-        component_id = data.get("component_id")
-        
-        if not component_id:
-            continue
-        
-        metadata = get_component_metadata(component_id)
-        if not metadata:
-             logger.warning(f"Component metadata not found for {component_id}")
-             continue
-             
-        node_list.append({
-            "id": node["id"],
-            "component_id": component_id,
-            "phase": metadata.get("type", "unknown"),
-            "config": data.get("config", {}),
-        })
-        
-    phase_order = {"pre_process": 0, "review": 1, "post_process": 2, "unknown": 99}
-    node_list.sort(key=lambda x: phase_order.get(x["phase"], 99))
-    
-    for node in node_list:
-        steps.append({
-            "id": f"step_{node['id']}",
-            "component_id": node["component_id"],
-            "config": node["config"],
-            "phase": node["phase"]
-        })
-        
-    return steps
-
 
 @checklist_review_bp.post("/api/run-process")
 def api_run_process():
     data = request.get_json()
     collection_name = data.get("collection_name")
-    process_data = data.get("process_data")
-    process_name = data.get("process_name")
-    checklist_name = data.get("checklist_name")
-    target_paper = data.get("target_paper")
+    pipeline_id = data.get("pipeline_id")
+    criteria_set_name = data.get("criteria_set_name")
+    target_artifact = data.get("target_artifact")
 
     if not collection_name:
         return jsonify({"error": "Missing collection_name"}), 400
-    if not process_name:
-        return jsonify({"error": "Missing pipeline id (process_name)"}), 400
+    if not pipeline_id:
+        return jsonify({"error": "Missing pipeline id (pipeline_id)"}), 400
+    if not criteria_set_name:
+        return jsonify({"error": "Missing criteria_set_name"}), 400
         
     collections_root = get_collections_dir()
-    selected_papers = storage.list_selected_files(collections_root, collection_name)
+    selected_artifacts = storage.list_selected_files(collections_root, collection_name)
     
-    if target_paper:
-        selected_papers = [p for p in selected_papers if p.get("filename") == target_paper]
+    if target_artifact:
+        selected_artifacts = [p for p in selected_artifacts if p.get("filename") == target_artifact]
 
     try:
-        review_process_def = _resolve_review_process_definition(process_name, process_data)
+        review_process_def = build_review_process_definition(pipeline_id)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    execution_name = review_process_def.get("name") or process_name
+    execution_name = review_process_def.get("name") or pipeline_id
     
     results = []
-    
-    if not checklist_name:
-        checklist_name = "checklist_neurips" 
         
-    for paper in selected_papers:
-        paper_name = paper.get("filename")
-        if not paper_name: continue
+    for artifact in selected_artifacts:
+        artifact_name = artifact.get("filename")
+        if not artifact_name: continue
         
-        if process_name and storage.process_result_exists(collections_root, collection_name, process_name, paper_name, checklist_name):
-            logger.info(f"Skipping {paper_name}, answer already exists for {process_name} with checklist {checklist_name}")
+        if pipeline_id and storage.process_result_exists(collections_root, collection_name, pipeline_id, artifact_name, criteria_set_name):
+            logger.info(f"Skipping {artifact_name}, answer already exists for {pipeline_id} with checklist {criteria_set_name}")
             continue
         
         try:
@@ -1111,12 +888,12 @@ def api_run_process():
             
             run_result = process_instance.execute(
                 collection_name=collection_name,
-                artifact_name=paper_name,
-                criteria_set_name=checklist_name,
+                artifact_name=artifact_name,
+                criteria_set_name=criteria_set_name,
             )
             result_summary = {
-                "paper_id": paper.get("paper_id", paper_name),
-                "filename": paper_name,
+                "artifact_id": artifact.get("artifact_id", artifact_name),
+                "filename": artifact_name,
                 "status": "completed",
             }
             if run_result and run_result.get("token_usage"):
@@ -1124,9 +901,9 @@ def api_run_process():
             results.append(result_summary)
             
         except Exception as e:
-            logger.error(f"Failed to process {paper_name}: {e}")
+            logger.error(f"Failed to process {artifact_name}: {e}")
             results.append({
-                "paper_id": paper.get("paper_id", paper_name),
+                "artifact_id": artifact.get("artifact_id", artifact_name),
                 "status": "failed",
                 "error": str(e)
             })
@@ -1137,59 +914,59 @@ def api_run_process():
 @checklist_review_bp.get("/api/results")
 def api_list_results():
     collection_name = request.args.get("collection_name")
-    paper_id = request.args.get("paper_id")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
+    artifact_id = request.args.get("artifact_id")
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
     
     if not collection_name:
         return jsonify([])
         
     collections_root = get_collections_dir()
     
-    if paper_id:
-        res = storage.load_generated_answer(collections_root, collection_name, paper_id, process_name, checklist_name)
+    if artifact_id:
+        res = storage.load_evaluation(collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name)
         if res:
             return jsonify(res)
         return jsonify({"status": "not_found", "message": "No result found"}), 200
     else:
-        results = storage.list_generated_answers(collections_root, collection_name, process_name, checklist_name)
+        results = storage.list_evaluations(collections_root, collection_name, pipeline_id, criteria_set_name)
         return jsonify(results)
 
 
-@checklist_review_bp.delete("/api/results/<paper_id>")
-def api_delete_result(paper_id):
+@checklist_review_bp.delete("/api/results/<artifact_id>")
+def api_delete_result(artifact_id):
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
 
     if not collection_name:
         return jsonify({"error": "Missing collection_name"}), 400
         
     collections_root = get_collections_dir()
-    success = storage.delete_generated_answer(collections_root, collection_name, paper_id, process_name, checklist_name)
+    success = storage.delete_evaluation(collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name)
     return jsonify({"success": success})
 
 
 @checklist_review_bp.delete("/api/results")
 def api_delete_all_results():
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
 
-    if not all([collection_name, process_name, checklist_name]):
-        return jsonify({"error": "Missing collection_name, process_name, or checklist_name"}), 400
+    if not all([collection_name, pipeline_id, criteria_set_name]):
+        return jsonify({"error": "Missing collection_name, pipeline_id, or criteria_set_name"}), 400
 
     collections_root = get_collections_dir()
-    results = storage.list_generated_answers(collections_root, collection_name, process_name, checklist_name)
+    results = storage.list_evaluations(collections_root, collection_name, pipeline_id, criteria_set_name)
     if not results:
         return jsonify({"success": True, "deleted_count": 0, "total_count": 0})
 
     deleted_count = 0
     for item in results:
-        paper_id = item.get("paper_id") or item.get("filename")
-        if not paper_id:
+        artifact_id = item.get("artifact_id") or item.get("filename")
+        if not artifact_id:
             continue
-        if storage.delete_generated_answer(collections_root, collection_name, paper_id, process_name, checklist_name):
+        if storage.delete_evaluation(collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name):
             deleted_count += 1
 
     return jsonify({
@@ -1203,13 +980,13 @@ def api_delete_all_results():
 def api_list_outputs():
     """List files in the outputs/ folder for the selected collection, process, checklist, and paper."""
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
-    paper_id = request.args.get("paper_id")
-    if not all([collection_name, process_name, checklist_name, paper_id]):
-        return jsonify({"error": "Missing collection_name, process_name, checklist_name, or paper_id"}), 400
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
+    artifact_id = request.args.get("artifact_id")
+    if not all([collection_name, pipeline_id, criteria_set_name, artifact_id]):
+        return jsonify({"error": "Missing collection_name, pipeline_id, criteria_set_name, or artifact_id"}), 400
     collections_root = Path(get_collections_dir())
-    items = storage.list_review_outputs(collections_root, collection_name, process_name, checklist_name, paper_id)
+    items = storage.list_review_outputs(collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id)
     return jsonify(items)
 
 
@@ -1217,14 +994,14 @@ def api_list_outputs():
 def api_get_token_usage():
     """Return token_usage.json for the given collection, process, checklist, and paper."""
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
-    paper_id = request.args.get("paper_id")
-    if not all([collection_name, process_name, checklist_name, paper_id]):
-        return jsonify({"error": "Missing collection_name, process_name, checklist_name, or paper_id"}), 400
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
+    artifact_id = request.args.get("artifact_id")
+    if not all([collection_name, pipeline_id, criteria_set_name, artifact_id]):
+        return jsonify({"error": "Missing collection_name, pipeline_id, criteria_set_name, or artifact_id"}), 400
     collections_root = Path(get_collections_dir())
     paper_dir = storage.get_review_paper_dir(
-        collections_root, collection_name, process_name, checklist_name, paper_id
+        collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id
     )
     if not paper_dir:
         return jsonify({"error": "Paper folder not found"}), 404
@@ -1248,17 +1025,17 @@ def api_get_token_usage():
 def api_get_collection_token_usage_summary():
     """Return aggregated token usage across all reviewed papers for a collection/process/checklist."""
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
-    if not all([collection_name, process_name, checklist_name]):
-        return jsonify({"error": "Missing collection_name, process_name, or checklist_name"}), 400
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
+    if not all([collection_name, pipeline_id, criteria_set_name]):
+        return jsonify({"error": "Missing collection_name, pipeline_id, or criteria_set_name"}), 400
 
     collections_root = Path(get_collections_dir())
-    reviewed_results = storage.list_generated_answers(
+    reviewed_results = storage.list_evaluations(
         collections_root,
         collection_name,
-        process_name,
-        checklist_name,
+        pipeline_id,
+        criteria_set_name,
     )
 
     summary: Dict[str, Any] = {
@@ -1272,16 +1049,16 @@ def api_get_collection_token_usage_summary():
     }
 
     for item in reviewed_results:
-        paper_id = item.get("paper_id")
-        if not paper_id:
+        artifact_id = item.get("artifact_id")
+        if not artifact_id:
             continue
 
         paper_dir = storage.get_review_paper_dir(
             collections_root,
             collection_name,
-            process_name,
-            checklist_name,
-            paper_id,
+            pipeline_id,
+            criteria_set_name,
+            artifact_id,
         )
         if not paper_dir:
             summary["papers_missing_token_data"] += 1
@@ -1326,16 +1103,16 @@ def api_get_collection_token_usage_summary():
 def api_serve_output_file():
     """Serve a single file from the outputs/ folder. Use ?download=1 for attachment."""
     collection_name = request.args.get("collection_name")
-    process_name = request.args.get("process_name")
-    checklist_name = request.args.get("checklist_name")
-    paper_id = request.args.get("paper_id")
+    pipeline_id = request.args.get("pipeline_id")
+    criteria_set_name = request.args.get("criteria_set_name")
+    artifact_id = request.args.get("artifact_id")
     filename = request.args.get("filename")
-    if not all([collection_name, process_name, checklist_name, paper_id, filename]):
+    if not all([collection_name, pipeline_id, criteria_set_name, artifact_id, filename]):
         return jsonify({"error": "Missing required query parameters"}), 400
     if "/" in filename or "\\" in filename or filename.startswith("."):
         return jsonify({"error": "Invalid filename"}), 400
     collections_root = Path(get_collections_dir())
-    outputs_dir = storage.get_review_outputs_dir(collections_root, collection_name, process_name, checklist_name, paper_id)
+    outputs_dir = storage.get_review_outputs_dir(collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id)
     if not outputs_dir:
         return jsonify({"error": "Outputs folder not found"}), 404
     file_path = (outputs_dir / filename).resolve()
@@ -1357,17 +1134,18 @@ def api_start_review():
             return jsonify({"error": "Invalid request. Please try again."}), 400
         
         collection_name = data.get("collection_name")
-        process_data = data.get("process_data")
-        process_name = data.get("process_name")
-        checklist_name = data.get("checklist_name")
+        pipeline_id = data.get("pipeline_id")
+        criteria_set_name = data.get("criteria_set_name")
         
-        logger.info(f"Start review request: collection={collection_name}, process={process_name}, checklist={checklist_name}")
+        logger.info(f"Start review request: collection={collection_name}, pipeline={pipeline_id}, criteria_set={criteria_set_name}")
         
         if not collection_name:
             return jsonify({"error": "Please select a collection first."}), 400
-        if not process_name:
+        if not pipeline_id:
             return jsonify({"error": "Please select a pipeline first."}), 400
-        
+        if not criteria_set_name:
+            return jsonify({"error": "Please select a criteria set first."}), 400
+
         collections_root = get_collections_dir()
         collections_root_path = Path(collections_root)
 
@@ -1413,34 +1191,30 @@ def api_start_review():
                 "task_id": running_task.task_id
             }), 400
         
-        selected_papers = storage.list_selected_files(collections_root, collection_name)
-        logger.info(f"Found {len(selected_papers)} papers in collection")
+        selected_artifacts = storage.list_selected_files(collections_root, collection_name)
+        logger.info(f"Found {len(selected_artifacts)} papers in collection")
         
-        if process_name:
-            results = storage.list_generated_answers(collections_root, collection_name, process_name, checklist_name)
+        if pipeline_id:
+            results = storage.list_evaluations(collections_root, collection_name, pipeline_id, criteria_set_name)
             processed_set = {r.get("filename") for r in results if r.get("filename")}
-            selected_papers = [p for p in selected_papers if p.get("filename") not in processed_set]
-            logger.info(f"After filtering, {len(selected_papers)} papers to process")
+            selected_artifacts = [p for p in selected_artifacts if p.get("filename") not in processed_set]
+            logger.info(f"After filtering, {len(selected_artifacts)} papers to process")
         
-        if not selected_papers:
+        if not selected_artifacts:
             total_papers = storage.list_selected_files(collections_root, collection_name)
             if len(total_papers) == 0:
                 return jsonify({"error": "No papers found in this collection. Please add papers first."}), 400
             else:
                 return jsonify({"error": "All papers in this collection have already been reviewed. Please add new papers or select a different collection."}), 400
         
-        if not checklist_name:
-            checklist_name = "checklist_neurips"
-        
         task_id = task_manager.create_task(
             collection_name=collection_name,
-            process_name=process_name or "default",
-            checklist_name=checklist_name,
-            process_data=process_data or {},
-            papers=selected_papers,
+            pipeline_id=pipeline_id,
+            criteria_set_name=criteria_set_name,
+            artifacts=selected_artifacts,
         )
         
-        logger.info(f"Created task {task_id} with {len(selected_papers)} papers")
+        logger.info(f"Created task {task_id} with {len(selected_artifacts)} artifacts")
         
         task = task_manager.get_task(task_id)
         if task:
@@ -1448,10 +1222,9 @@ def api_start_review():
                 collections_root,
                 task_id,
                 collection_name=task.collection_name,
-                process_name=task.process_name,
-                checklist_name=task.checklist_name,
-                process_data=task.process_data,
-                papers=task.papers,
+                pipeline_id=task.pipeline_id,
+                criteria_set_name=task.criteria_set_name,
+                artifacts=task.artifacts,
                 progress={
                     "current": task.progress.current,
                     "total": task.progress.total,
@@ -1479,7 +1252,7 @@ def api_start_review():
         return jsonify({
             "task_id": task_id,
             "message": "Review process started",
-            "total_papers": len(selected_papers)
+            "total_papers": len(selected_artifacts)
         })
     except Exception as e:
         logger.error(f"Error in api_start_review: {e}", exc_info=True)
@@ -1522,7 +1295,7 @@ def api_review_status(task_id):
             for result in progress.results:
                 if isinstance(result, dict):
                     results.append({
-                        "paper_id": str(result.get("paper_id", "")),
+                        "artifact_id": str(result.get("artifact_id", "")),
                         "filename": str(result.get("filename", "")),
                         "status": str(result.get("status", "")),
                         "error": str(result.get("error", "")) if result.get("error") else None
@@ -1668,7 +1441,7 @@ def _run_review_process_background(task_id: str, collections_root):
             task.progress.completed_at = datetime.now()
             return
         
-        logger.info(f"Task found: {task_id}, papers: {len(task.papers)}")
+        logger.info(f"Task found: {task_id}, papers: {len(task.artifacts)}")
         task.progress.status = TaskStatus.RUNNING
         logger.info(f"Task status set to RUNNING for {task_id}")
         
@@ -1683,32 +1456,32 @@ def _run_review_process_background(task_id: str, collections_root):
             except Exception as e:
                 logger.error(f"Error adding log message: {e}", exc_info=True)
         
-        checklist_name = task.checklist_name
-        if checklist_name and ('/' in checklist_name or '\\' in checklist_name):
+        criteria_set_name = task.criteria_set_name
+        if criteria_set_name and ('/' in criteria_set_name or '\\' in criteria_set_name):
             from pathlib import Path
-            checklist_path = Path(checklist_name)
-            checklist_name = checklist_path.stem
+            checklist_path = Path(criteria_set_name)
+            criteria_set_name = checklist_path.stem
         
         try:
-            review_process_def = _resolve_review_process_definition(task.process_name, task.process_data)
+            review_process_def = build_review_process_definition(task.pipeline_id)
         except Exception as e:
             logger.error(f"Error loading pipeline: {e}", exc_info=True)
             add_log_message(f"Error: Failed to load pipeline: {str(e)}", "error")
             raise
         
-        for idx, paper in enumerate(task.papers):
+        for idx, paper in enumerate(task.artifacts):
             if task.stop_event.is_set():
                 task.progress.status = TaskStatus.STOPPED
                 task.progress.completed_at = datetime.now()
-                logger.info(f"Task {task_id} stopped at paper {idx + 1}/{len(task.papers)}")
+                logger.info(f"Task {task_id} stopped at paper {idx + 1}/{len(task.artifacts)}")
                 return
             
-            paper_name = paper.get("filename")
-            if not paper_name:
+            artifact_name = artifact.get("filename")
+            if not artifact_name:
                 continue
             
             task.progress.current = idx
-            task.progress.current_item = paper_name
+            task.progress.current_item = artifact_name
             
             try:
                 process_instance = ReviewProcess(
@@ -1719,43 +1492,43 @@ def _run_review_process_background(task_id: str, collections_root):
                 )
                 run_result = process_instance.execute(
                     collection_name=task.collection_name,
-                    artifact_name=paper_name,
-                    criteria_set_name=checklist_name,
+                    artifact_name=artifact_name,
+                    criteria_set_name=criteria_set_name,
                     artifact_index=idx + 1,
-                    total_artifacts=len(task.papers),
+                    total_artifacts=len(task.artifacts),
                 )
                 if task.stop_event.is_set():
                     task.progress.status = TaskStatus.STOPPED
                     task.progress.completed_at = datetime.now()
-                    logger.info(f"Task {task_id} stopped after completing {paper_name}")
+                    logger.info(f"Task {task_id} stopped after completing {artifact_name}")
                     return
                 result_summary = {
-                    "paper_id": paper.get("paper_id", paper_name),
-                    "filename": paper_name,
+                    "artifact_id": artifact.get("artifact_id", artifact_name),
+                    "filename": artifact_name,
                     "status": "completed",
                 }
                 if run_result and run_result.get("token_usage"):
                     result_summary["token_usage"] = run_result["token_usage"]
                 task.progress.results.append(result_summary)
             except InterruptedError as e:
-                logger.info(f"Task {task_id} interrupted during execution of {paper_name}: {e}")
+                logger.info(f"Task {task_id} interrupted during execution of {artifact_name}: {e}")
                 task.progress.status = TaskStatus.STOPPED
                 task.progress.completed_at = datetime.now()
                 add_log_message(f"Review stopped by user", "warning")
                 result_summary = {
-                    "paper_id": paper.get("paper_id", paper_name),
-                    "filename": paper_name,
+                    "artifact_id": artifact.get("artifact_id", artifact_name),
+                    "filename": artifact_name,
                     "status": "stopped",
                     "error": "Stopped by user"
                 }
                 task.progress.results.append(result_summary)
                 return
             except Exception as e:
-                logger.error(f"Failed to process {paper_name}: {e}", exc_info=True)
+                logger.error(f"Failed to process {artifact_name}: {e}", exc_info=True)
                 add_log_message(f"Error processing paper: {str(e)}", "error")
                 result_summary = {
-                    "paper_id": paper.get("paper_id", paper_name),
-                    "filename": paper_name,
+                    "artifact_id": artifact.get("artifact_id", artifact_name),
+                    "filename": artifact_name,
                     "status": "failed",
                     "error": str(e)
                 }
@@ -1764,11 +1537,11 @@ def _run_review_process_background(task_id: str, collections_root):
                 if task.stop_event.is_set():
                     task.progress.status = TaskStatus.STOPPED
                     task.progress.completed_at = datetime.now()
-                    logger.info(f"Task {task_id} stopped after error on {paper_name}")
+                    logger.info(f"Task {task_id} stopped after error on {artifact_name}")
                     return
         
         task.progress.status = TaskStatus.COMPLETED
-        task.progress.current = len(task.papers)
+        task.progress.current = len(task.artifacts)
         task.progress.completed_at = datetime.now()
         logger.info(f"Task {task_id} completed successfully")
         
@@ -1809,11 +1582,10 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
         logger.error(f"Subprocess: task {task_id} payload not found in file")
         return
 
-    papers = payload.get("papers", [])
+    artifacts = payload.get("artifacts", [])
     collection_name = payload.get("collection_name", "")
-    process_name = payload.get("process_name", "")
-    checklist_name = payload.get("checklist_name", "")
-    process_data = payload.get("process_data", {})
+    pipeline_id = payload.get("pipeline_id", "")
+    criteria_set_name = payload.get("criteria_set_name", "")
 
     if tp.stop_requested(collections_root, task_id):
         logger.info(f"Task {task_id} stop requested before start")
@@ -1827,7 +1599,7 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
     progress = dict(payload.get("progress", {}))
     progress["status"] = TaskStatus.RUNNING.value
     progress["started_at"] = progress.get("started_at") or datetime.now().isoformat()
-    progress["total"] = len(papers)
+    progress["total"] = len(artifacts)
     tp.write_progress(collections_root, task_id, progress)
 
     stop_event = threading.Event()
@@ -1851,11 +1623,11 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
         })
         tp.write_progress(collections_root, task_id, progress)
 
-    if checklist_name and ("/" in checklist_name or "\\" in checklist_name):
-        checklist_name = Path(checklist_name).stem
+    if criteria_set_name and ("/" in criteria_set_name or "\\" in criteria_set_name):
+        criteria_set_name = Path(criteria_set_name).stem
 
     try:
-        review_process_def = _resolve_review_process_definition(process_name, process_data)
+        review_process_def = build_review_process_definition(pipeline_id)
     except Exception as e:
         logger.error(f"Error loading pipeline: {e}", exc_info=True)
         add_log_message(f"Error: Failed to load pipeline: {str(e)}", "error")
@@ -1865,21 +1637,21 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
         tp.write_progress(collections_root, task_id, progress)
         return
 
-    for idx, paper in enumerate(papers):
+    for idx, artifact in enumerate(artifacts):
         if stop_event.is_set():
             progress["status"] = TaskStatus.STOPPED.value
             progress["completed_at"] = datetime.now().isoformat()
             progress["current"] = idx
             tp.write_progress(collections_root, task_id, progress)
-            logger.info(f"Task {task_id} stopped at paper {idx + 1}/{len(papers)}")
+            logger.info(f"Task {task_id} stopped at paper {idx + 1}/{len(artifacts)}")
             return
 
-        paper_name = paper.get("filename")
-        if not paper_name:
+        artifact_name = artifact.get("filename")
+        if not artifact_name:
             continue
 
         progress["current"] = idx
-        progress["current_item"] = paper_name
+        progress["current_item"] = artifact_name
         tp.write_progress(collections_root, task_id, progress)
 
         try:
@@ -1891,10 +1663,10 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
             )
             run_result = process_instance.execute(
                 collection_name=collection_name,
-                artifact_name=paper_name,
-                criteria_set_name=checklist_name,
+                artifact_name=artifact_name,
+                criteria_set_name=criteria_set_name,
                 artifact_index=idx + 1,
-                total_artifacts=len(papers),
+                total_artifacts=len(artifacts),
             )
             if stop_event.is_set():
                 progress["status"] = TaskStatus.STOPPED.value
@@ -1904,8 +1676,8 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
                 return
             progress["results"] = progress.get("results") or []
             result_entry = {
-                "paper_id": paper.get("paper_id", paper_name),
-                "filename": paper_name,
+                "artifact_id": artifact.get("artifact_id", artifact_name),
+                "filename": artifact_name,
                 "status": "completed",
             }
             if run_result and run_result.get("token_usage"):
@@ -1917,20 +1689,20 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
             add_log_message("Review stopped by user", "warning")
             progress["results"] = progress.get("results") or []
             progress["results"].append({
-                "paper_id": paper.get("paper_id", paper_name),
-                "filename": paper_name,
+                "artifact_id": artifact.get("artifact_id", artifact_name),
+                "filename": artifact_name,
                 "status": "stopped",
                 "error": "Stopped by user",
             })
             tp.write_progress(collections_root, task_id, progress)
             return
         except Exception as e:
-            logger.error(f"Failed to process {paper_name}: {e}", exc_info=True)
+            logger.error(f"Failed to process {artifact_name}: {e}", exc_info=True)
             add_log_message(f"Error processing paper: {str(e)}", "error")
             progress["results"] = progress.get("results") or []
             progress["results"].append({
-                "paper_id": paper.get("paper_id", paper_name),
-                "filename": paper_name,
+                "artifact_id": artifact.get("artifact_id", artifact_name),
+                "filename": artifact_name,
                 "status": "failed",
                 "error": str(e),
             })
@@ -1942,7 +1714,7 @@ def _run_review_process_background_subprocess(task_id: str, collections_root: Pa
                 return
 
     progress["status"] = TaskStatus.COMPLETED.value
-    progress["current"] = len(papers)
+    progress["current"] = len(artifacts)
     progress["completed_at"] = datetime.now().isoformat()
     tp.write_progress(collections_root, task_id, progress)
     logger.info(f"Task {task_id} completed successfully")

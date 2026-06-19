@@ -13,35 +13,35 @@ def _slug(name: str) -> str:
 class PdfWriter(BaseComponent):
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         collection_name = inputs.get("collection_name")
-        review_process_name = inputs.get("review_process_name")
-        paper_name = inputs.get("paper_name")
-        checklist_name = inputs.get("checklist_name")
+        pipeline_name = inputs.get("pipeline_name")
+        artifact_name = inputs.get("artifact_name")
+        criteria_set_name = inputs.get("criteria_set_name")
 
-        if not all([collection_name, review_process_name, paper_name]):
-            raise ValueError("Missing required inputs: collection_name, review_process_name, or paper_name")
+        if not all([collection_name, pipeline_name, artifact_name]):
+            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
             project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
-        paper_output_dir = collection_dir / "review_processes" / _slug(review_process_name)
+        paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
 
-        if checklist_name:
-            checklist_name_clean = checklist_name.rstrip(".json") if checklist_name.endswith(".json") else checklist_name
-            paper_output_dir = paper_output_dir / _slug(checklist_name_clean)
+        if criteria_set_name:
+            criteria_set_name_clean = criteria_set_name.rstrip(".json") if criteria_set_name.endswith(".json") else criteria_set_name
+            paper_output_dir = paper_output_dir / _slug(criteria_set_name_clean)
 
-        paper_output_dir = paper_output_dir / paper_name
-        answers_file = paper_output_dir / "answers.json"
+        paper_output_dir = paper_output_dir / artifact_name
+        evaluations_file = paper_output_dir / "evaluations.json"
 
-        if not answers_file.exists():
-            return {"status": "skipped", "reason": "No answers.json found"}
+        if not evaluations_file.exists():
+            return {"status": "skipped", "reason": "No evaluations.json found"}
 
-        with open(answers_file, "r", encoding="utf-8") as f:
-            answers = json.load(f)
+        with open(evaluations_file, "r", encoding="utf-8") as f:
+            evaluations = json.load(f)
 
-        if isinstance(answers, dict):
-            answers = list(answers.values())
+        if isinstance(evaluations, dict):
+            evaluations = list(evaluations.values())
 
         output_dir = paper_output_dir / "outputs"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -49,11 +49,11 @@ class PdfWriter(BaseComponent):
 
         save_details = self.config.get("save_details", False)
         self._generate_pdf(
-            paper_name,
-            answers,
+            artifact_name,
+            evaluations,
             output_path,
-            review_process_name=review_process_name or "",
-            checklist_name=checklist_name or "",
+            pipeline_name=pipeline_name or "",
+            criteria_set_name=criteria_set_name or "",
             save_details=save_details,
         )
 
@@ -65,11 +65,11 @@ class PdfWriter(BaseComponent):
 
     def _generate_pdf(
         self,
-        paper_name: str,
-        answers: List[Dict[str, Any]],
+        artifact_name: str,
+        evaluations: List[Dict[str, Any]],
         output_path: Path,
-        review_process_name: str = "",
-        checklist_name: str = "",
+        pipeline_name: str = "",
+        criteria_set_name: str = "",
         save_details: bool = False,
     ) -> None:
         try:
@@ -165,11 +165,11 @@ class PdfWriter(BaseComponent):
         )
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        story.append(Paragraph(f"Review Report: {paper_name}", title_style))
-        if review_process_name:
-            story.append(Paragraph(f"Review Process: {review_process_name}", styles["Normal"]))
-        if checklist_name:
-            story.append(Paragraph(f"Checklist: {checklist_name}", styles["Normal"]))
+        story.append(Paragraph(f"Review Report: {artifact_name}", title_style))
+        if pipeline_name:
+            story.append(Paragraph(f"Review Process: {pipeline_name}", styles["Normal"]))
+        if criteria_set_name:
+            story.append(Paragraph(f"Checklist: {criteria_set_name}", styles["Normal"]))
         story.append(Paragraph(f"Generated on: {timestamp}", styles["Normal"]))
         story.append(Spacer(1, 0.25 * inch))
         story.append(Paragraph("Detailed Review", heading_style))
@@ -180,8 +180,8 @@ class PdfWriter(BaseComponent):
             s = str(s).replace("<br>", " ").strip()
             return (s[: max_len] + "…") if len(s) > max_len else s
 
-        for i, item in enumerate(answers, 1):
-            question = clean(item.get("question_text", "N/A"))
+        for i, item in enumerate(evaluations, 1):
+            question = clean(item.get("criterion_text", "N/A"))
             is_yes = item.get("answer") in (True, "yes", "true", "Yes", "True")
             answer_text = "Yes" if is_yes else "No"
             answer_style = answer_yes_style if is_yes else answer_no_style

@@ -11,10 +11,10 @@ def _slug(name: str) -> str:
 
 
 def _answer_entry(item: Dict[str, Any], save_details: bool) -> Dict[str, Any]:
-    """One answer for JSON: when save_details is False only question_text and answer (True/False)."""
+    """One answer for JSON: when save_details is False only criterion_text and answer (True/False)."""
     out = {
-        "question_id": item.get("question_id"),
-        "question_text": item.get("question_text", "N/A"),
+        "criterion_id": item.get("criterion_id"),
+        "criterion_text": item.get("criterion_text", "N/A"),
         "answer": item.get("answer") in (True, "yes", "true", "Yes", "True"),
     }
     if save_details and item.get("supporting_texts"):
@@ -25,43 +25,43 @@ def _answer_entry(item: Dict[str, Any], save_details: bool) -> Dict[str, Any]:
 class JsonWriter(BaseComponent):
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         collection_name = inputs.get("collection_name")
-        review_process_name = inputs.get("review_process_name")
-        paper_name = inputs.get("paper_name")
-        checklist_name = inputs.get("checklist_name")
+        pipeline_name = inputs.get("pipeline_name")
+        artifact_name = inputs.get("artifact_name")
+        criteria_set_name = inputs.get("criteria_set_name")
 
-        if not all([collection_name, review_process_name, paper_name]):
-            raise ValueError("Missing required inputs: collection_name, review_process_name, or paper_name")
+        if not all([collection_name, pipeline_name, artifact_name]):
+            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
             project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
-        paper_output_dir = collection_dir / "review_processes" / _slug(review_process_name)
+        paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
 
-        if checklist_name:
-            checklist_name_clean = checklist_name.rstrip(".json") if checklist_name.endswith(".json") else checklist_name
-            paper_output_dir = paper_output_dir / _slug(checklist_name_clean)
+        if criteria_set_name:
+            criteria_set_name_clean = criteria_set_name.rstrip(".json") if criteria_set_name.endswith(".json") else criteria_set_name
+            paper_output_dir = paper_output_dir / _slug(criteria_set_name_clean)
 
-        paper_output_dir = paper_output_dir / paper_name
-        answers_file = paper_output_dir / "answers.json"
+        paper_output_dir = paper_output_dir / artifact_name
+        evaluations_file = paper_output_dir / "evaluations.json"
 
-        if not answers_file.exists():
-            return {"status": "skipped", "reason": "No answers.json found"}
+        if not evaluations_file.exists():
+            return {"status": "skipped", "reason": "No evaluations.json found"}
 
-        with open(answers_file, "r", encoding="utf-8") as f:
-            answers = json.load(f)
+        with open(evaluations_file, "r", encoding="utf-8") as f:
+            evaluations = json.load(f)
 
-        if isinstance(answers, dict):
-            answers = list(answers.values())
+        if isinstance(evaluations, dict):
+            evaluations = list(evaluations.values())
 
         save_details = self.config.get("save_details", False)
         token_usage = inputs.get("token_usage")
         payload = self._build_payload(
-            paper_name,
-            answers,
-            review_process_name=review_process_name or "",
-            checklist_name=checklist_name or "",
+            artifact_name,
+            evaluations,
+            pipeline_name=pipeline_name or "",
+            criteria_set_name=criteria_set_name or "",
             save_details=save_details,
             token_usage=token_usage,
         )
@@ -86,20 +86,20 @@ class JsonWriter(BaseComponent):
 
     def _build_payload(
         self,
-        paper_name: str,
-        answers: List[Dict[str, Any]],
-        review_process_name: str = "",
-        checklist_name: str = "",
+        artifact_name: str,
+        evaluations: List[Dict[str, Any]],
+        pipeline_name: str = "",
+        criteria_set_name: str = "",
         save_details: bool = False,
         token_usage: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         payload = {
-            "paper_name": paper_name,
-            "review_process": review_process_name,
-            "checklist": checklist_name,
+            "artifact_name": artifact_name,
+            "review_process": pipeline_name,
+            "checklist": criteria_set_name,
             "generated_at": timestamp,
-            "answers": [_answer_entry(a, save_details) for a in answers],
+            "evaluations": [_answer_entry(a, save_details) for a in evaluations],
         }
         if token_usage and (token_usage.get("total_tokens") or token_usage.get("by_model")):
             payload["metadata"] = {

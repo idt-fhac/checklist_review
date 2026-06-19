@@ -190,7 +190,7 @@ if __name__ == "__main__":
         question="Does the repository contain a README file?",
         collection_name="ml_papers",
         review_process_name="Demo Review Process",
-        checklist_name="checklist_neurips",
+        criteria_set_name="example",
         paper_name="EDITING MODELS WITH TASK ARITHMETIC.pdf",
         # log_callback=lambda x: print(x),
     )

@@ -78,24 +78,21 @@ def write_task_payload(
     task_id: str,
     *,
     collection_name: str,
-    process_name: str,
-    checklist_name: str,
-    process_data: Dict[str, Any],
-    papers: list,
+    pipeline_id: str,
+    criteria_set_name: str,
+    artifacts: list,
     progress: Optional[Dict[str, Any]] = None,
 ) -> Path:
-    """Write full task payload and optional progress to disk (for child process)."""
     path = task_file_path(collections_root, task_id)
     payload = {
         "task_id": task_id,
         "collection_name": collection_name,
-        "process_name": process_name,
-        "checklist_name": checklist_name,
-        "process_data": process_data,
-        "papers": papers,
+        "pipeline_id": pipeline_id,
+        "criteria_set_name": criteria_set_name,
+        "artifacts": artifacts,
         "progress": progress or {
             "current": 0,
-            "total": len(papers),
+            "total": len(artifacts),
             "current_item": "",
             "status": "pending",
             "error": None,

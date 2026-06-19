@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         processList.innerHTML = '<div class="text-center p-4" style="color: #64748b;"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>';
         try {
-            const res = await fetch(`/analysis/api/processes?collection_name=${currentSelectedCollection.slug}`);
+            const res = await fetch(`/analysis/api/pipelines?collection_name=${currentSelectedCollection.slug}`);
             const processes = await res.json();
             
             processList.innerHTML = '';
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         checklistList.innerHTML = '<div class="text-center p-4" style="color: #64748b;"><div class="spinner-border spinner-border-sm me-2"></div>Loading...</div>';
         try {
-            const res = await fetch('/analysis/api/checklists');
+            const res = await fetch('/analysis/api/criteria-sets');
             const checklists = await res.json();
             
             checklistList.innerHTML = '';
@@ -300,13 +300,13 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingState.style.display = 'block';
         
         try {
-            const res = await fetch(`/analysis/api/report?collection_name=${currentSelectedCollection.slug}&process_name=${currentSelectedProcess.slug}&checklist_name=${encodeURIComponent(currentSelectedChecklist.name)}`);
+            const res = await fetch(`/analysis/api/report?collection_name=${currentSelectedCollection.slug}&pipeline_id=${currentSelectedProcess.slug}&criteria_set_name=${encodeURIComponent(currentSelectedChecklist.name)}`);
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.error || `Request failed (${res.status})`);
             }
             const data = await res.json();
-            if (!data || !data.automated || !data.human || !Array.isArray(data.breakdown)) {
+            if (!data || !data.automated || !Array.isArray(data.breakdown)) {
                 throw new Error('Invalid report data from server');
             }
             lastReportCollectionName = sanitizeFilenamePart(currentSelectedCollection?.slug || currentSelectedCollection?.name);
@@ -407,24 +407,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportAutomatedBtn = document.getElementById('exportAutomatedBtn');
         const exportHumanBtn = document.getElementById('exportHumanBtn');
         if (exportAutomatedBtn) exportAutomatedBtn.disabled = false;
-        if (exportHumanBtn) exportHumanBtn.disabled = false;
-        
-        // Top Stats
+        if (exportHumanBtn) exportHumanBtn.disabled = true;
+
         const auto = data.automated;
-        const human = data.human;
-        
-        document.getElementById('statTotalPapers').textContent = auto.total_papers;
-        
+        const totalArtifacts = auto.total_artifacts ?? auto.total_papers ?? 0;
+        document.getElementById('statTotalPapers').textContent = totalArtifacts;
+
         const totalAnswers = auto.distribution.yes + auto.distribution.no + auto.distribution.na;
         const yesRate = totalAnswers > 0 ? Math.round(auto.distribution.yes / totalAnswers * 100) : 0;
         document.getElementById('statYesRate').textContent = `${yesRate}%`;
-        
-        document.getElementById('statVerifiedCount').textContent = human.verified_papers_count;
-        document.getElementById('statVerifiedPct').textContent = `${human.verification_coverage_pct}%`;
-        
-        document.getElementById('statAgreement').textContent = `${human.agreement.agreement_rate}%`;
-        
-        // ----- Automated: overall summary bar + legend -----
+
+        const humanPanel = document.querySelector('.analysis-panel-human');
+        if (humanPanel) humanPanel.style.display = 'none';
+
         const yesPctOverall = totalAnswers > 0 ? Math.round(auto.distribution.yes / totalAnswers * 100) : 0;
         const noPctOverall = totalAnswers > 0 ? Math.round(auto.distribution.no / totalAnswers * 100) : 0;
         const overallBarYes = document.getElementById('overallBarYes');
@@ -438,12 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="overall-legend-item"><span class="overall-legend-dot overall-legend-dot-no"></span><strong>No</strong> ${auto.distribution.no} (${noPctOverall}%)</span>
             `;
         }
-        
-        // ----- Automated: stacked horizontal bar (Yes vs No by question) -----
+
         const breakdownSorted = [...data.breakdown].sort((a, b) => (a.yes_pct || 0) - (b.yes_pct || 0));
-        const questionLabels = breakdownSorted.map(b => {
-            const q = b.question || '';
-            return q.length > 50 ? q.slice(0, 47) + '...' : q;
+        const criterionLabels = breakdownSorted.map(b => {
+            const label = b.criterion || b.question || '';
+            return label.length > 50 ? label.slice(0, 47) + '...' : label;
         });
         const ctxStacked = document.getElementById('automatedChartStacked');
         const stackedWrap = ctxStacked && ctxStacked.closest('.panel-chart-wrap-stacked');
@@ -453,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             automatedStackedChart = new Chart(ctxStacked.getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: questionLabels,
+                    labels: criterionLabels,
                     datasets: [
                         { label: 'Yes', data: breakdownSorted.map(b => b.yes_pct || 0), backgroundColor: '#198754', barThickness: 'flex', order: 2 },
                         { label: 'No', data: breakdownSorted.map(b => b.no_pct != null ? b.no_pct : (100 - (b.yes_pct || 0))), backgroundColor: '#dc3545', barThickness: 'flex', order: 1 }
@@ -469,14 +463,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             callbacks: {
                                 title: function(context) {
                                     const i = context[0].dataIndex;
-                                    return breakdownSorted[i] ? (breakdownSorted[i].question || 'Question') : '';
+                                    const item = breakdownSorted[i];
+                                    return item ? (item.criterion || item.question || 'Criterion') : '';
                                 },
                                 afterBody: function(context) {
                                     const i = context[0].dataIndex;
                                     const b = breakdownSorted[i];
                                     const total = b && (b.total != null ? b.total : (b.yes_count + b.no_count));
                                     if (total == null) return '';
-                                    return `Total answers: ${total}`;
+                                    return `Total evaluations: ${total}`;
                                 }
                             }
                         }
@@ -496,52 +491,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        
-        // Automated Breakdown Table
+
         const autoBody = document.getElementById('automatedTableBody');
         autoBody.innerHTML = '';
         data.breakdown.forEach(item => {
             const row = `<tr>
-                <td>${item.question}</td>
+                <td>${item.criterion || item.question || ''}</td>
                 <td class="text-end fw-bold">${item.yes_pct}%</td>
             </tr>`;
             autoBody.innerHTML += row;
-        });
-        
-        // Human Chart
-        const ctxHuman = document.getElementById('humanChart').getContext('2d');
-        if(humanChart) humanChart.destroy();
-        humanChart = new Chart(ctxHuman, {
-            type: 'pie',
-            data: {
-                labels: ['Agreed', 'Disagreed'],
-                datasets: [{
-                    data: [human.agreement.agreed, human.agreement.disagreed],
-                    backgroundColor: ['#ffc107', '#fd7e14'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }
-            }
-        });
-        
-        // Verification Table
-        const verBody = document.getElementById('verificationTableBody');
-        verBody.innerHTML = '';
-        data.breakdown.forEach(item => {
-            // Only show if there's verification data
-            if(item.verified_count > 0) {
-                const row = `<tr>
-                    <td>${item.question}</td>
-                    <td class="text-center">${item.verified_count}</td>
-                    <td class="text-end fw-bold ${item.agreement_rate > 80 ? 'text-success' : (item.agreement_rate < 50 ? 'text-danger' : 'text-warning')}">
-                        ${item.agreement_rate}%
-                    </td>
-                </tr>`;
-                verBody.innerHTML += row;
-            }
         });
     }
 });

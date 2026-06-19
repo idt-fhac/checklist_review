@@ -5,12 +5,12 @@ from src.review_workflow.engine.tool_loader import (
     discover_review_tools,
     get_tool_as_tool_function
 )
-from src.review_workflow.components.evaluators.question_reviewer.helpers import clean_text_for_encoding
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
 from strands import Agent
 
 
 def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any], 
-                        paper_pages: Optional[List[Dict[str, Any]]] = None,
+                        artifact_pages: Optional[List[Dict[str, Any]]] = None,
                         context: Optional[Dict[str, Any]] = None) -> Agent:
     
     base_prompt = config.get("system_prompt", "You are a question-answering assistant that reviews research papers.")
@@ -37,9 +37,9 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
 
     base_prompt = clean_text_for_encoding(base_prompt)
     
-    # if paper_pages:
-    #     max_page = max((p.get("page_number", 0) for p in paper_pages), default=0)
-    #     additional_text = f"\n\nThe paper has {len(paper_pages)} pages (pages 1-{max_page}). Use valid page numbers from this range when referencing specific pages."
+    # if artifact_pages:
+    #     max_page = max((p.get("page_number", 0) for p in artifact_pages), default=0)
+    #     additional_text = f"\n\nThe paper has {len(artifact_pages)} pages (pages 1-{max_page}). Use valid page numbers from this range when referencing specific pages."
     #     additional_text = clean_text_for_encoding(additional_text)
     #     base_prompt += additional_text
     

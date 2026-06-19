@@ -1,0 +1,38 @@
+{
+  "id": "document_loader",
+  "name": "Document Loader",
+  "type": "pre_process",
+  "description": "Loads artifact content from the collection, optionally re-extracting from PDF.",
+  "inputs": [
+    {"name": "collection_name", "type": "string"},
+    {"name": "artifact_name", "type": "string"},
+    {"name": "pipeline_name", "type": "string"},
+    {"name": "criteria_set_name", "type": "string"}
+  ],
+  "outputs": [
+    {"name": "output_file", "type": "string"},
+    {"name": "output_type", "type": "string"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "extraction_method": {
+        "type": "string",
+        "enum": ["Extracted Content", "Force Re-Extract"],
+        "default": "Extracted Content",
+        "label": "Extraction Method"
+      },
+      "extract_pages_as_image": {
+        "type": "boolean",
+        "default": false,
+        "label": "Extract Pages as Image"
+      },
+      "force_execution": {
+        "type": "boolean",
+        "default": false,
+        "label": "Force Execution"
+      }
+    },
+    "required": ["extraction_method"]
+  }
+}
