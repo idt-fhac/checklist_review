@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review Platform</title>
+  <link rel="stylesheet" href="{{ url_for('frontend.static', filename='css/review.css') }}" />
+</head>
+<body>
+  <header>
+    <h1>Automated Review</h1>
+    <p>Upload documents, run a pipeline, and download structured feedback.</p>
+  </header>
+
+  <main>
+    <div id="errorBanner" class="error-banner" role="alert"></div>
+
+    <nav class="steps" aria-label="Review steps">
+      <span class="step-pill active" data-step="1">1. Pipeline</span>
+      <span class="step-pill" data-step="2">2. Upload</span>
+      <span class="step-pill" data-step="3">3. Run</span>
+      <span class="step-pill" data-step="4">4. Report</span>
+    </nav>
+
+    <section id="panel-setup" class="panel active" data-step="1">
+      <h2>Choose pipeline and project</h2>
+      <div class="field">
+        <label for="pipelineSelect">Pipeline</label>
+        <select id="pipelineSelect"></select>
+        <small id="pipelineHint"></small>
+      </div>
+      <div class="field">
+        <label for="collectionName">Project name</label>
+        <input id="collectionName" type="text" placeholder="my_tender_bid" />
+        <small>A new project folder is created for each review run.</small>
+      </div>
+      <div class="field" id="criteriaSetField">
+        <label for="criteriaSetSelect">Criteria set</label>
+        <select id="criteriaSetSelect"></select>
+        <small id="criteriaSetHint">Required for checklist pipelines; auto-extracted for tender.</small>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="btnToUpload">Continue to upload</button>
+      </div>
+    </section>
+
+    <section id="panel-upload" class="panel" data-step="2">
+      <h2>Upload documents</h2>
+      <div class="upload-grid">
+        <div class="file-card" id="rfpCard">
+          <h3>Requirements / RFP</h3>
+          <input type="file" id="rfpFile" accept=".pdf" />
+          <div class="file-status" id="rfpStatus">Optional for checklist pipelines; required for tender.</div>
+        </div>
+        <div class="file-card" id="draftCard">
+          <h3>Draft to evaluate</h3>
+          <input type="file" id="draftFile" accept=".pdf" />
+          <div class="file-status" id="draftStatus">PDF of the artifact under review.</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top: 1rem;">
+        <label for="referenceUrls">Reference links (one per line)</label>
+        <textarea id="referenceUrls" placeholder="https://example.com/spec&#10;https://example.com/standard"></textarea>
+      </div>
+      <div class="actions">
+        <button type="button" class="secondary" id="btnBackSetup">Back</button>
+        <button type="button" class="primary" id="btnToRun">Continue to run</button>
+      </div>
+    </section>
+
+    <section id="panel-run" class="panel" data-step="3">
+      <h2>Run review</h2>
+      <p id="runSummary" style="color: var(--muted); font-size: 0.9rem;"></p>
+      <div class="progress-bar"><div id="progressFill"></div></div>
+      <p id="progressLabel" style="font-size: 0.9rem;">Ready to start.</p>
+      <div class="log-box" id="logBox"></div>
+      <div class="actions">
+        <button type="button" class="secondary" id="btnBackUpload">Back</button>
+        <button type="button" class="primary" id="btnStartReview">Start review</button>
+        <button type="button" class="secondary" id="btnCancelReview" disabled>Cancel</button>
+      </div>
+    </section>
+
+    <section id="panel-report" class="panel" data-step="4">
+      <h2>Report</h2>
+      <div id="reportMeta" style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+      <div id="reportSummary" class="report-summary"></div>
+      <div id="reportDownloads" class="actions" style="margin-bottom: 1rem;"></div>
+      <table class="eval-table">
+        <thead>
+          <tr>
+            <th>Criterion</th>
+            <th>Result</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+      <div class="actions">
+        <button type="button" class="secondary" id="btnNewReview">Start new review</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('frontend.static', filename='js/review.js') }}"></script>
+</body>
+</html>
