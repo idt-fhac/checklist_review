@@ -225,19 +225,20 @@ def load_collection(collections_root: Path, collection_name: str) -> Dict[str, A
         if filename:
             valid_filenames.add(filename)
     
-    # Filter selected files to only include papers that exist
-    filtered_selected = [
-        entry for entry in selected_files
-        if (entry.get("artifact_id") in valid_artifact_ids
-            or entry.get("arxiv_id") in valid_artifact_ids
-            or entry.get("filename") in valid_filenames)
-    ]
-    
-    # If any were filtered out, save the cleaned list
-    if len(filtered_selected) != len(selected_files):
-        save_selected_list(collections_root, collection_name, filtered_selected)
-    
-    data["selected_files"] = filtered_selected
+    # Filter selected files to only include papers that exist in collection metadata.
+    # When papers is empty (API upload flow), keep selected_papers.json entries as-is.
+    if papers:
+        filtered_selected = [
+            entry for entry in selected_files
+            if (entry.get("artifact_id") in valid_artifact_ids
+                or entry.get("arxiv_id") in valid_artifact_ids
+                or entry.get("filename") in valid_filenames)
+        ]
+        if len(filtered_selected) != len(selected_files):
+            save_selected_list(collections_root, collection_name, filtered_selected)
+        data["selected_files"] = filtered_selected
+    else:
+        data["selected_files"] = selected_files
     return data
 
 

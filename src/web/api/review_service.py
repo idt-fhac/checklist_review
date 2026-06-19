@@ -341,21 +341,21 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
 
         persona_manifest = _read_json_if_exists(
             get_persona_manifest_path(
-                collections_root,
                 collection_name,
                 pipeline_id,
                 filename,
                 criteria_set_name,
+                collections_root,
             )
         )
         persona_evaluations = {}
         if persona_manifest:
             persona_dir = get_persona_evaluations_dir(
-                collections_root,
                 collection_name,
                 pipeline_id,
                 filename,
                 criteria_set_name,
+                collections_root,
             )
             for persona_file in sorted(persona_dir.glob("*.json")):
                 if persona_file.name == "manifest.json":

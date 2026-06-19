@@ -23,3 +23,12 @@ dependencies = [
 ]
 
 # Run the app: uv run app.py  (uv installs deps into .venv automatically)
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
