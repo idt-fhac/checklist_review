@@ -1,0 +1,26 @@
+{
+  "id": "search_tool",
+  "name": "Web Search",
+  "display_name": "Web Search (Serper)",
+  "description": "Search the web via Serper to verify external claims during evaluation.",
+  "type": "tool",
+  "inputs": [],
+  "outputs": [
+    {"name": "tool_def", "type": "object"}
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_results": {
+        "type": "integer",
+        "label": "Max results",
+        "description": "Override config/search.yaml max_results"
+      },
+      "allowed_domains": {
+        "type": "array",
+        "label": "Allowed domains",
+        "description": "Optional domain allowlist"
+      }
+    }
+  }
+}

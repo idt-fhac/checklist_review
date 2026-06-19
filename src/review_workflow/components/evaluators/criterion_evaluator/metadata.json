@@ -60,6 +60,16 @@
         "type": "string",
         "label": "Embedding Provider",
         "ui:if": {"use_rag": true, "answer_all_together": {"$ne": true}}
+      },
+      "use_search": {
+        "type": "boolean",
+        "default": false,
+        "label": "Use web search (Serper)"
+      },
+      "search_max_results": {
+        "type": "integer",
+        "label": "Search max results",
+        "ui:if": {"use_search": true}
       }
     },
     "required": ["provider_id"]

@@ -35,6 +35,13 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
             "available page images, or pass explicit page numbers inferred from the paper (e.g. figure captions, \"page N\").\n"
         )
 
+    if config.get("use_search"):
+        base_prompt += (
+            "\nExternal verification: web_search is available. Use it when a criterion depends on facts outside the artifact "
+            "(regulations, company credentials, market data, standards compliance, or verifiable public claims). "
+            "Cite URLs from search results when they influence your answer.\n"
+        )
+
     base_prompt = clean_text_for_encoding(base_prompt)
     
     # if artifact_pages:
@@ -50,6 +57,21 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
     
     # Discover available tools once
     tools_registry = discover_review_tools()
+
+    if config.get("use_search") and "search_tool" in tools_registry:
+        search_cfg = {"max_results": config.get("search_max_results")}
+        if config.get("search_allowed_domains"):
+            search_cfg["allowed_domains"] = config.get("search_allowed_domains")
+        search_func = get_tool_as_tool_function(
+            tool_id="search_tool",
+            tool_config=search_cfg,
+            context=context,
+            tools_registry=tools_registry,
+        )
+        if search_func:
+            agent_tools.append(search_func)
+        elif context and context.get("log_callback"):
+            context["log_callback"]("Failed to load web_search tool", "warning")
     
     # Dynamically load tools from config
     for tool_item in config.get("tools", []):
