@@ -14,3 +14,8 @@ frontend_bp = Blueprint(
 @frontend_bp.get("/")
 def review_app():
     return render_template("review.html")
+
+
+@frontend_bp.get("/review/<review_id>")
+def review_app_deep_link(review_id: str):
+    return render_template("review.html")

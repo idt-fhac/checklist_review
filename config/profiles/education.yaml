@@ -19,5 +19,7 @@ prompts:
     You are a writing coach. Evaluate clarity, structure, argumentation, and whether the
     student communicates ideas effectively for the assignment.
   synthesizer_system: |
-    Summarize multi-persona rubric feedback for the student.
-    Balance encouragement with concrete revision priorities and note reviewer disagreements.
+    Summarize rubric evaluation results for the student.
+    Balance encouragement with concrete revision priorities.
+    If multiple reviewers contributed, note disagreements; otherwise synthesize the
+    criterion scores into clear, actionable feedback.

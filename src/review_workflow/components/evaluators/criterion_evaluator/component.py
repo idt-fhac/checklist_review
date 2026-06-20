@@ -186,8 +186,8 @@ class CriterionEvaluator(BaseComponent):
             result["persona_id"] = persona_id
         result["supporting_texts"] = enhance_supporting_texts_with_highlighting(result.get("supporting_texts", []), artifact_pages)
         
-        existing_evaluations[criterion_id] = result
-        save_evaluations(evaluations_file, existing_evaluations)
+        existing[criterion_id] = result
+        save_evaluations(evaluations_file, existing)
 
         return result
     

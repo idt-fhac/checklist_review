@@ -303,8 +303,12 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
             continue
 
         evaluations = storage.load_evaluation(
-            collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name
+            collections_root, collection_name, filename, pipeline_id, criteria_set_name
         )
+        if evaluations is None and artifact_id and artifact_id != filename:
+            evaluations = storage.load_evaluation(
+                collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name
+            )
         if isinstance(evaluations, list):
             evaluation_items = evaluations
         elif isinstance(evaluations, dict):

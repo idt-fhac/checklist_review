@@ -18,6 +18,13 @@ def test_scientific_checklist_stays_single_persona():
     assert definition["evaluation"]["personas"] == []
 
 
+def test_education_rubric_includes_synthesis():
+    definition = build_review_process_definition("education_rubric")
+    assert definition["feedback_synthesizer"]
+    assert definition["feedback_synthesizer"]["config"]["provider_id"] == "primary_llm"
+    assert "Summarize rubric evaluation" in definition["feedback_synthesizer"]["config"]["system_prompt"]
+
+
 def test_process_definition_includes_core_stages():
     definition = build_review_process_definition("tender_full")
     assert definition["document_loader"]

@@ -18,6 +18,14 @@ function $(id) {
   return document.getElementById(id);
 }
 
+function setText(id, value) {
+  const el = $(id);
+  if (el) {
+    el.textContent = value;
+  }
+  return el;
+}
+
 function showError(message) {
   const banner = $("errorBanner");
   banner.textContent = message;
@@ -47,7 +55,218 @@ function setStep(step) {
   document.querySelectorAll(".panel").forEach((panel) => {
     panel.classList.toggle("active", Number(panel.dataset.step) === step);
   });
+  updateSelectionSummaryVisibility();
   clearError();
+}
+
+function pipelineLabel() {
+  const match = state.pipelines.find((pipeline) => pipeline.id === state.pipelineId);
+  return match?.name || state.pipelineDetail?.name || state.pipelineId || "—";
+}
+
+function criteriaLabel() {
+  const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
+  if (hasExtractor) {
+    return state.rfpFilename ? `From RFP: ${state.rfpFilename}` : "Extracted from RFP";
+  }
+  return $("criteriaSetSelect")?.value || state.criteriaSetName || "—";
+}
+
+function updateSelectionSummary() {
+  const project = state.collectionName || $("collectionName")?.value.trim() || "—";
+  setText("summaryProject", project);
+
+  setText("summaryPipeline", pipelineLabel());
+  const personas = state.pipelineDetail?.personas || [];
+  const meta = [];
+  if (state.pipelineDetail?.profile) {
+    meta.push(`Profile: ${state.pipelineDetail.profile}`);
+  }
+  if (state.pipelineDetail?.evaluation_mode === "multi_persona" && personas.length) {
+    meta.push(`Personas: ${personas.map((p) => p.label || p.id).join(", ")}`);
+  }
+  setText("summaryPipelineMeta", meta.join(" · "));
+
+  setText("summaryCriteria", criteriaLabel());
+
+  const draftRow = $("summaryDraftRow");
+  const draftName = $("draftStatus")?.textContent?.replace(/^Uploaded:\s*/, "") || "";
+  if (draftRow && state.draftArtifactId && draftName && !draftName.startsWith("PDF of")) {
+    draftRow.hidden = false;
+    setText("summaryDraft", draftName);
+  } else if (draftRow) {
+    draftRow.hidden = true;
+    setText("summaryDraft", "—");
+  }
+}
+
+function updateSelectionSummaryVisibility() {
+  const summary = $("selectionSummary");
+  if (!summary) {
+    return;
+  }
+  summary.hidden = state.step < 2;
+}
+
+function setButtonLoading(button, loading, loadingText) {
+  if (!button) {
+    return;
+  }
+  const label = button.querySelector(".btn-label") || button;
+  if (loading) {
+    button.disabled = true;
+    button.classList.add("loading");
+    if (label === button) {
+      if (!button.dataset.originalHtml) {
+        button.dataset.originalHtml = button.innerHTML;
+      }
+      button.innerHTML = `<span class="spinner" aria-hidden="true"></span>${loadingText || "Working…"}`;
+    } else {
+      label.textContent = loadingText || "Working…";
+    }
+    return;
+  }
+
+  button.disabled = false;
+  button.classList.remove("loading");
+  if (button.dataset.originalHtml) {
+    button.innerHTML = button.dataset.originalHtml;
+    delete button.dataset.originalHtml;
+  } else if (label !== button) {
+    label.textContent = "Run review";
+  }
+}
+
+function showReviewProgress() {
+  const progress = $("reviewProgress");
+  const report = $("reportContent");
+  if (progress) {
+    progress.hidden = false;
+  }
+  if (report) {
+    report.hidden = true;
+  }
+}
+
+function showReportContent() {
+  const progress = $("reviewProgress");
+  const report = $("reportContent");
+  if (progress) {
+    progress.hidden = true;
+  }
+  if (report) {
+    report.hidden = false;
+  }
+}
+
+function getReviewIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const queryReview = params.get("review");
+  if (queryReview) {
+    return queryReview;
+  }
+  const match = window.location.pathname.match(/^\/review\/([^/]+)\/?$/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+function buildReviewUrl(reviewId) {
+  return `/review/${encodeURIComponent(reviewId)}`;
+}
+
+function syncReviewUrl(reviewId) {
+  const nextUrl = reviewId ? buildReviewUrl(reviewId) : "/";
+  const currentUrl = `${window.location.pathname}${window.location.search}`;
+  if (currentUrl !== nextUrl) {
+    history.replaceState({ reviewId: reviewId || "" }, "", nextUrl);
+  }
+}
+
+function updateShareLink() {
+  const shareRow = $("reportShare");
+  const link = $("reportShareLink");
+  if (!shareRow || !link || !state.reviewId) {
+    if (shareRow) {
+      shareRow.style.display = "none";
+    }
+    return;
+  }
+  const url = `${window.location.origin}${buildReviewUrl(state.reviewId)}`;
+  shareRow.style.display = "flex";
+  link.href = url;
+  link.textContent = url;
+}
+
+async function copyReviewLink() {
+  if (!state.reviewId) {
+    return;
+  }
+  const url = `${window.location.origin}${buildReviewUrl(state.reviewId)}`;
+  await navigator.clipboard.writeText(url);
+  const button = $("btnCopyReviewLink");
+  const previous = button.textContent;
+  button.textContent = "Copied!";
+  setTimeout(() => {
+    button.textContent = previous;
+  }, 1500);
+}
+
+async function openReviewFromUrl(reviewId) {
+  state.reviewId = reviewId;
+  syncReviewUrl(reviewId);
+
+  const status = await fetchJSON(`${API}/reviews/${reviewId}`);
+  state.collectionName = status.collection_name || "";
+  state.pipelineId = status.pipeline_id || "";
+  if (state.pipelineId && $("pipelineSelect")) {
+    $("pipelineSelect").value = state.pipelineId;
+    await onPipelineChange();
+  }
+  if ($("collectionName")) {
+    $("collectionName").value = state.collectionName;
+  }
+  state.criteriaSetName = status.criteria_set_name || state.criteriaSetName;
+  if (status.criteria_source_name) {
+    state.rfpFilename = status.criteria_source_name;
+  }
+  if (state.criteriaSetName && $("criteriaSetSelect")) {
+    $("criteriaSetSelect").value = state.criteriaSetName;
+  }
+  const firstResult = (status.results || [])[0];
+  if (firstResult?.filename) {
+    state.draftArtifactId = firstResult.artifact_id || firstResult.filename.replace(/\.pdf$/i, "");
+    $("draftStatus").textContent = `Uploaded: ${firstResult.filename}`;
+  }
+  updateSelectionSummary();
+  updateProgress(status);
+
+  if (status.status === "completed") {
+    await loadReport();
+    setStep(3);
+    showReportContent();
+    return;
+  }
+
+  setStep(3);
+  showReviewProgress();
+  if (["running", "pending"].includes(status.status)) {
+    const cancelButton = $("btnCancelReview");
+    if (cancelButton) {
+      cancelButton.disabled = false;
+    }
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+    }
+    state.pollTimer = setInterval(pollReview, 2000);
+    return;
+  }
+
+  const cancelButton = $("btnCancelReview");
+  if (cancelButton) {
+    cancelButton.disabled = true;
+  }
+  if (status.error) {
+    showError(status.error);
+  }
 }
 
 function pipelineHasExtractor(detail) {
@@ -103,6 +322,7 @@ async function onPipelineChange() {
   }
   $("pipelineHint").textContent = hint.join(" · ");
   updateCriteriaVisibility();
+  updateSelectionSummary();
 }
 
 async function ensureCollection() {
@@ -147,36 +367,49 @@ async function saveReferences() {
   });
 }
 
-async function handleUploadStep() {
-  await ensureCollection();
-  const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
-  const rfpInput = $("rfpFile");
-  const draftInput = $("draftFile");
+async function handleUploadAndStart() {
+  const btn = $("btnRunReview");
+  setButtonLoading(btn, true, "Uploading…");
+  try {
+    await ensureCollection();
+    const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
+    const rfpInput = $("rfpFile");
+    const draftInput = $("draftFile");
 
-  if (hasExtractor && !rfpInput.files.length) {
-    throw new Error("Upload the RFP / requirements PDF for this pipeline.");
+    if (hasExtractor && !rfpInput.files.length) {
+      throw new Error("Upload the RFP / requirements PDF for this pipeline.");
+    }
+    if (!draftInput.files.length) {
+      throw new Error("Upload the draft PDF to evaluate.");
+    }
+
+    if (rfpInput.files.length) {
+      const result = await uploadDocument(rfpInput.files[0], "rfp");
+      state.rfpFilename = result.filename;
+      $("rfpCard").classList.add("uploaded");
+      $("rfpStatus").textContent = `Uploaded: ${result.filename}`;
+    }
+
+    const draftResult = await uploadDocument(draftInput.files[0], "artifact");
+    state.draftArtifactId = draftResult.artifact_id || draftResult.filename.replace(/\.pdf$/i, "");
+    $("draftCard").classList.add("uploaded");
+    $("draftStatus").textContent = `Uploaded: ${draftResult.filename}`;
+
+    await saveReferences();
+    state.criteriaSetName = $("criteriaSetSelect")?.value || state.criteriaSetName;
+    updateSelectionSummary();
+
+    setStep(3);
+    showReviewProgress();
+    $("progressLabel").textContent = "Starting review…";
+    $("progressFill").style.width = "0%";
+    $("logBox").innerHTML = "";
+    setButtonLoading(btn, true, "Starting review…");
+
+    await startReview();
+  } finally {
+    setButtonLoading(btn, false);
   }
-  if (!draftInput.files.length) {
-    throw new Error("Upload the draft PDF to evaluate.");
-  }
-
-  if (rfpInput.files.length) {
-    const result = await uploadDocument(rfpInput.files[0], "rfp");
-    state.rfpFilename = result.filename;
-    $("rfpCard").classList.add("uploaded");
-    $("rfpStatus").textContent = `Uploaded: ${result.filename}`;
-  }
-
-  const draftResult = await uploadDocument(draftInput.files[0], "artifact");
-  state.draftArtifactId = draftResult.artifact_id || draftResult.filename.replace(/\.pdf$/i, "");
-  $("draftCard").classList.add("uploaded");
-  $("draftStatus").textContent = `Uploaded: ${draftResult.filename}`;
-
-  await saveReferences();
-
-  $("runSummary").textContent =
-    `Project: ${state.collectionName} · Pipeline: ${state.pipelineId} · Draft: ${draftResult.filename}`;
-  setStep(3);
 }
 
 function renderLogs(messages) {
@@ -194,10 +427,15 @@ function updateProgress(status) {
   const total = status.total || 1;
   const current = status.current || 0;
   const pct = Math.min(100, Math.round((current / total) * 100));
-  $("progressFill").style.width = `${pct}%`;
-  $("progressLabel").textContent =
+  const progressFill = $("progressFill");
+  if (progressFill) {
+    progressFill.style.width = `${pct}%`;
+  }
+  setText(
+    "progressLabel",
     `${status.status} — ${current}/${total}` +
-    (status.current_item ? ` · ${status.current_item}` : "");
+      (status.current_item ? ` · ${status.current_item}` : ""),
+  );
   renderLogs(status.log_messages || []);
 }
 
@@ -210,11 +448,10 @@ async function pollReview() {
   if (["completed", "failed", "stopped"].includes(status.status)) {
     clearInterval(state.pollTimer);
     state.pollTimer = null;
-    $("btnStartReview").disabled = false;
     $("btnCancelReview").disabled = true;
     if (status.status === "completed") {
       await loadReport();
-      setStep(4);
+      showReportContent();
     } else if (status.error) {
       showError(status.error);
     }
@@ -241,7 +478,7 @@ async function startReview() {
   });
 
   state.reviewId = result.review_id;
-  $("btnStartReview").disabled = true;
+  syncReviewUrl(state.reviewId);
   $("btnCancelReview").disabled = false;
   state.pollTimer = setInterval(pollReview, 2000);
   await pollReview();
@@ -271,13 +508,34 @@ function answerBadge(answer) {
   return span;
 }
 
+function buildEvaluationSummary(evaluations) {
+  if (!evaluations?.length) {
+    return "";
+  }
+  const met = evaluations.filter((item) => item.answer === true).length;
+  const notMet = evaluations.filter((item) => item.answer === false).length;
+  const other = evaluations.length - met - notMet;
+  const parts = [`${evaluations.length} criteria evaluated`];
+  if (met) {
+    parts.push(`${met} met`);
+  }
+  if (notMet) {
+    parts.push(`${notMet} not met`);
+  }
+  if (other) {
+    parts.push(`${other} partial/other`);
+  }
+  return `${parts.join(" · ")}. See per-criterion results below.`;
+}
+
 async function loadReport() {
   const report = await fetchJSON(`${API}/reviews/${state.reviewId}/report`);
   $("reportMeta").textContent =
     `Review ${report.review_id} · ${report.pipeline_id} · ${report.status}`;
+  updateShareLink();
 
   const artifact = (report.artifacts || [])[0];
-  const synthesis = artifact?.synthesis?.summary || "";
+  const synthesis = artifact?.synthesis?.summary || buildEvaluationSummary(artifact?.evaluations);
   $("reportSummary").textContent = synthesis || "No synthesis available.";
 
   const downloads = $("reportDownloads");
@@ -331,6 +589,7 @@ async function loadReport() {
 function resetApp() {
   if (state.pollTimer) {
     clearInterval(state.pollTimer);
+    state.pollTimer = null;
   }
   state.reviewId = "";
   state.rfpFilename = "";
@@ -342,12 +601,21 @@ function resetApp() {
   $("draftCard").classList.remove("uploaded");
   $("progressFill").style.width = "0%";
   $("logBox").innerHTML = "";
+  $("progressLabel").textContent = "Starting…";
+  showReviewProgress();
+  updateShareLink();
+  syncReviewUrl("");
   setStep(1);
 }
 
 function bindEvents() {
-  $("pipelineSelect").addEventListener("change", () => onPipelineChange().catch(showError));
-  $("btnToUpload").addEventListener("click", async () => {
+  $("pipelineSelect")?.addEventListener("change", () => onPipelineChange().catch(showError));
+  $("criteriaSetSelect")?.addEventListener("change", () => {
+    state.criteriaSetName = $("criteriaSetSelect").value;
+    updateSelectionSummary();
+  });
+  $("collectionName")?.addEventListener("input", () => updateSelectionSummary());
+  $("btnToUpload")?.addEventListener("click", async () => {
     try {
       if (!$("collectionName").value.trim()) {
         throw new Error("Enter a project name.");
@@ -355,23 +623,39 @@ function bindEvents() {
       if (!pipelineHasExtractor(state.pipelineDetail) && !$("criteriaSetSelect").value) {
         throw new Error("Select a criteria set.");
       }
+      state.collectionName = $("collectionName").value.trim();
+      state.criteriaSetName = $("criteriaSetSelect").value || state.criteriaSetName;
+      updateSelectionSummary();
       setStep(2);
     } catch (err) {
       showError(err.message);
     }
   });
-  $("btnBackSetup").addEventListener("click", () => setStep(1));
-  $("btnToRun").addEventListener("click", () => handleUploadStep().catch(showError));
-  $("btnBackUpload").addEventListener("click", () => setStep(2));
-  $("btnStartReview").addEventListener("click", () => startReview().catch(showError));
-  $("btnCancelReview").addEventListener("click", () => cancelReview().catch(showError));
-  $("btnNewReview").addEventListener("click", resetApp);
+  $("btnBackSetup")?.addEventListener("click", () => setStep(1));
+  $("btnRunReview")?.addEventListener("click", () => handleUploadAndStart().catch(showError));
+  $("btnCancelReview")?.addEventListener("click", () => cancelReview().catch(showError));
+  $("btnCopyReviewLink")?.addEventListener("click", () => copyReviewLink().catch(showError));
+  $("btnNewReview")?.addEventListener("click", resetApp);
+  window.addEventListener("popstate", () => {
+    const reviewId = getReviewIdFromUrl();
+    if (reviewId) {
+      openReviewFromUrl(reviewId).catch(showError);
+      return;
+    }
+    if (state.reviewId) {
+      resetApp();
+    }
+  });
 }
 
 async function init() {
   bindEvents();
   try {
     await Promise.all([loadPipelines(), loadCriteriaSets()]);
+    const reviewId = getReviewIdFromUrl();
+    if (reviewId) {
+      await openReviewFromUrl(reviewId);
+    }
   } catch (err) {
     showError(err.message);
   }

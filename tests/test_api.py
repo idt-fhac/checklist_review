@@ -28,6 +28,14 @@ class TestFrontend:
         assert b"Automated Review" in response.data
         assert b"/ui-static/js/review.js" in response.data
 
+    def test_review_deep_link_route(self, client):
+        review_id = "3fab6135-a129-4413-af4f-cfab76668372"
+        response = client.get(f"/review/{review_id}")
+        assert response.status_code == 200
+        assert b"Automated Review" in response.data
+        assert b"reportShareLink" in response.data
+        assert b"selectionSummary" in response.data
+
     def test_frontend_static_assets(self, client):
         response = client.get("/ui-static/css/review.css")
         assert response.status_code == 200
@@ -193,3 +201,36 @@ class TestReviewsApi:
         assert report["status"] == "completed"
         assert report["artifacts"][0]["evaluations"][0]["criterion_text"] == "Has abstract"
         assert report["artifacts"][0]["synthesis"]["summary"] == "Looks good overall."
+
+    def test_report_loads_evaluations_by_filename(self, client, isolated_workspace):
+        from src.review_workflow.engine.run_paths import artifact_run_dir
+
+        collections_root = isolated_workspace / "collections"
+        storage.create_new_collection(collections_root, "report_filename")
+        task_id = "report-task-2"
+        task_persistence.write_task_payload(
+            collections_root,
+            task_id,
+            collection_name="report_filename",
+            pipeline_id="scientific_checklist",
+            criteria_set_name="example",
+            artifacts=[{"filename": "doc.pdf", "artifact_id": "doc"}],
+            progress={"status": "completed", "current": 1, "total": 1, "results": [], "log_messages": []},
+        )
+
+        run_dir = artifact_run_dir(
+            collections_root,
+            "report_filename",
+            "scientific_checklist",
+            "doc.pdf",
+            "example",
+        )
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "evaluations.json").write_text(
+            json.dumps([{"criterion_id": "c1", "criterion_text": "Has title", "answer": True}]),
+            encoding="utf-8",
+        )
+
+        response = client.get(f"/api/v1/reviews/{task_id}/report")
+        assert response.status_code == 200
+        assert response.get_json()["artifacts"][0]["evaluations"][0]["criterion_text"] == "Has title"

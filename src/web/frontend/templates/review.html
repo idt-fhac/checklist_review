@@ -18,9 +18,28 @@
     <nav class="steps" aria-label="Review steps">
       <span class="step-pill active" data-step="1">1. Pipeline</span>
       <span class="step-pill" data-step="2">2. Upload</span>
-      <span class="step-pill" data-step="3">3. Run</span>
-      <span class="step-pill" data-step="4">4. Report</span>
+      <span class="step-pill" data-step="3">3. Report</span>
     </nav>
+
+    <aside id="selectionSummary" class="selection-summary" hidden aria-label="Current review setup">
+      <div class="selection-item">
+        <span class="selection-label">Project</span>
+        <strong id="summaryProject">—</strong>
+      </div>
+      <div class="selection-item">
+        <span class="selection-label">Pipeline</span>
+        <strong id="summaryPipeline">—</strong>
+        <span id="summaryPipelineMeta" class="selection-meta"></span>
+      </div>
+      <div class="selection-item">
+        <span class="selection-label">Criteria</span>
+        <strong id="summaryCriteria">—</strong>
+      </div>
+      <div class="selection-item" id="summaryDraftRow" hidden>
+        <span class="selection-label">Draft</span>
+        <strong id="summaryDraft">—</strong>
+      </div>
+    </aside>
 
     <section id="panel-setup" class="panel active" data-step="1">
       <h2>Choose pipeline and project</h2>
@@ -64,40 +83,45 @@
       </div>
       <div class="actions">
         <button type="button" class="secondary" id="btnBackSetup">Back</button>
-        <button type="button" class="primary" id="btnToRun">Continue to run</button>
+        <button type="button" class="primary" id="btnRunReview">
+          <span class="btn-label">Run review</span>
+        </button>
       </div>
     </section>
 
-    <section id="panel-run" class="panel" data-step="3">
-      <h2>Run review</h2>
-      <p id="runSummary" style="color: var(--muted); font-size: 0.9rem;"></p>
-      <div class="progress-bar"><div id="progressFill"></div></div>
-      <p id="progressLabel" style="font-size: 0.9rem;">Ready to start.</p>
-      <div class="log-box" id="logBox"></div>
-      <div class="actions">
-        <button type="button" class="secondary" id="btnBackUpload">Back</button>
-        <button type="button" class="primary" id="btnStartReview">Start review</button>
-        <button type="button" class="secondary" id="btnCancelReview" disabled>Cancel</button>
+    <section id="panel-report" class="panel" data-step="3">
+      <div id="reviewProgress">
+        <h2>Running review</h2>
+        <div class="progress-bar"><div id="progressFill"></div></div>
+        <p id="progressLabel" style="font-size: 0.9rem;">Starting…</p>
+        <div class="log-box" id="logBox"></div>
+        <div class="actions">
+          <button type="button" class="secondary" id="btnCancelReview">Cancel review</button>
+        </div>
       </div>
-    </section>
 
-    <section id="panel-report" class="panel" data-step="4">
-      <h2>Report</h2>
-      <div id="reportMeta" style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;"></div>
-      <div id="reportSummary" class="report-summary"></div>
-      <div id="reportDownloads" class="actions" style="margin-bottom: 1rem;"></div>
-      <table class="eval-table">
-        <thead>
-          <tr>
-            <th>Criterion</th>
-            <th>Result</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody id="reportBody"></tbody>
-      </table>
-      <div class="actions">
-        <button type="button" class="secondary" id="btnNewReview">Start new review</button>
+      <div id="reportContent" hidden>
+        <h2>Report</h2>
+        <div id="reportMeta" style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <div id="reportShare" class="share-row">
+          <a id="reportShareLink" href="#" target="_blank" rel="noopener"></a>
+          <button type="button" class="secondary" id="btnCopyReviewLink">Copy link</button>
+        </div>
+        <div id="reportSummary" class="report-summary"></div>
+        <div id="reportDownloads" class="actions" style="margin-bottom: 1rem;"></div>
+        <table class="eval-table">
+          <thead>
+            <tr>
+              <th>Criterion</th>
+              <th>Result</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+        <div class="actions">
+          <button type="button" class="secondary" id="btnNewReview">Start new review</button>
+        </div>
       </div>
     </section>
   </main>

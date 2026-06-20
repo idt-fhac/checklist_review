@@ -8,6 +8,9 @@ stages:
       provider: primary_llm
       force_review: true
       use_rag: false
+  - feedback_synthesizer:
+      provider: primary_llm
+      persona: educator
   - report_writer:
       component: pdf_writer
       save_details: true
