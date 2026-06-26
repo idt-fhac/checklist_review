@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -40,7 +39,11 @@ def serper_search(
         raise SearchError(f"Unsupported search provider: {cfg.get('provider')}")
 
     limit = max_results if max_results is not None else int(cfg.get("max_results") or 5)
-    domains = allowed_domains if allowed_domains is not None else (cfg.get("allowed_domains") or [])
+    domains = (
+        allowed_domains
+        if allowed_domains is not None
+        else (cfg.get("allowed_domains") or [])
+    )
 
     payload: Dict[str, Any] = {
         "q": query.strip(),
@@ -60,7 +63,9 @@ def serper_search(
         timeout=30,
     )
     if response.status_code != 200:
-        raise SearchError(f"Serper request failed ({response.status_code}): {response.text[:300]}")
+        raise SearchError(
+            f"Serper request failed ({response.status_code}): {response.text[:300]}"
+        )
 
     data = response.json()
     organic = data.get("organic") or []

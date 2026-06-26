@@ -1,9 +1,13 @@
 from typing import Optional, Sequence
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-import requests
 
-from src.core.providers import get_provider, get_provider_for_purpose, load_all_providers
+import numpy as np
+import requests
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from src.core.providers import (
+    get_provider,
+    get_provider_for_purpose,
+)
 
 
 class Embedding:
@@ -45,7 +49,9 @@ class Embedding:
                 self._vectorizer = None
             else:
                 self._embedding_type = "tfidf"
-                self._vectorizer = TfidfVectorizer(max_features=512, stop_words="english")
+                self._vectorizer = TfidfVectorizer(
+                    max_features=512, stop_words="english"
+                )
                 self._fitted = False
                 self._base_url = None
                 self._model = None
@@ -54,7 +60,9 @@ class Embedding:
                 self._provider_api_key = None
                 self._provider_port = None
         else:
-            raise ValueError("Embedding requires either embedding_provider_id or use_visualization_settings=True.")
+            raise ValueError(
+                "Embedding requires either embedding_provider_id or use_visualization_settings=True."
+            )
 
     def embed(self, text: str) -> np.ndarray:
         if self._embedding_type == "tfidf":
@@ -68,30 +76,43 @@ class Embedding:
                 response = requests.post(
                     f"{self._base_url}/api/embeddings",
                     json={"model": self._model, "prompt": text},
-                    timeout=120
+                    timeout=120,
                 )
             else:
                 # OpenAI-compatible API
                 headers = {"Content-Type": "application/json"}
                 if self._provider_api_key:
                     headers["Authorization"] = f"Bearer {self._provider_api_key}"
-                
+
                 # Handle port in base_url if needed
                 base_url = self._base_url
-                if self._provider_port and ":" not in base_url.split("//")[-1].split("/")[0]:
+                if (
+                    self._provider_port
+                    and ":" not in base_url.split("//")[-1].split("/")[0]
+                ):
                     from urllib.parse import urlparse, urlunparse
+
                     parsed = urlparse(base_url)
                     if not parsed.port:
                         netloc = f"{parsed.netloc}:{self._provider_port}"
-                        base_url = urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-                
+                        base_url = urlunparse(
+                            (
+                                parsed.scheme,
+                                netloc,
+                                parsed.path,
+                                parsed.params,
+                                parsed.query,
+                                parsed.fragment,
+                            )
+                        )
+
                 response = requests.post(
                     f"{base_url}/v1/embeddings",
                     headers=headers,
                     json={"model": self._model, "input": text},
-                    timeout=120
+                    timeout=120,
                 )
-            
+
             response.raise_for_status()
             data = response.json()
             # Handle both ollama format and OpenAI format
@@ -104,7 +125,7 @@ class Embedding:
             if not embedding:
                 raise ValueError("Embedding response missing data")
             return np.array(embedding, dtype=np.float32)
-    
+
     def embed_batch(self, texts: Sequence[str]) -> np.ndarray:
         if self._embedding_type == "tfidf":
             if not self._fitted:
@@ -116,7 +137,7 @@ class Embedding:
             for text in texts:
                 embeddings.append(self.embed(text))
             return np.array(embeddings, dtype=np.float32)
-    
+
     @property
     def vectorizer(self):
         return self._vectorizer

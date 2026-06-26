@@ -28,7 +28,9 @@ def get_config_criteria_sets_dir() -> Path:
 def save_yaml(path: Path, data: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        yaml.safe_dump(data, sort_keys=False, allow_unicode=True, default_flow_style=False),
+        yaml.safe_dump(
+            data, sort_keys=False, allow_unicode=True, default_flow_style=False
+        ),
         encoding="utf-8",
     )
 
@@ -89,7 +91,9 @@ def load_pipeline(pipeline_id: str) -> Dict[str, Any]:
         path = _CONFIG_DIR / "pipelines" / f"{slug}.yaml"
     data = _load_yaml(path)
     if not data:
-        raise FileNotFoundError(f"Pipeline '{pipeline_id}' not found in config/pipelines/")
+        raise FileNotFoundError(
+            f"Pipeline '{pipeline_id}' not found in config/pipelines/"
+        )
     data.setdefault("id", path.stem)
     return data
 

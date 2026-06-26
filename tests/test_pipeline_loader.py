@@ -22,7 +22,10 @@ def test_education_rubric_includes_synthesis():
     definition = build_review_process_definition("education_rubric")
     assert definition["feedback_synthesizer"]
     assert definition["feedback_synthesizer"]["config"]["provider_id"] == "primary_llm"
-    assert "Summarize rubric evaluation" in definition["feedback_synthesizer"]["config"]["system_prompt"]
+    assert (
+        "Summarize rubric evaluation"
+        in definition["feedback_synthesizer"]["config"]["system_prompt"]
+    )
 
 
 def test_process_definition_includes_core_stages():

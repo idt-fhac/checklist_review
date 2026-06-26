@@ -1,9 +1,9 @@
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-from src.core.criteria import criteria_set_stem
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from src.core.criteria import criteria_set_stem
 from src.review_workflow.engine.base import BaseComponent
 
 
@@ -31,11 +31,15 @@ class JsonWriter(BaseComponent):
         criteria_set_name = inputs.get("criteria_set_name")
 
         if not all([collection_name, pipeline_name, artifact_name]):
-            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
+            raise ValueError(
+                "Missing required inputs: collection_name, pipeline_name, or artifact_name"
+            )
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
-            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            project_root = (
+                Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            )
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
         paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
@@ -102,7 +106,9 @@ class JsonWriter(BaseComponent):
             "generated_at": timestamp,
             "evaluations": [_answer_entry(a, save_details) for a in evaluations],
         }
-        if token_usage and (token_usage.get("total_tokens") or token_usage.get("by_model")):
+        if token_usage and (
+            token_usage.get("total_tokens") or token_usage.get("by_model")
+        ):
             payload["metadata"] = {
                 "token_usage": self._format_token_usage(token_usage),
             }

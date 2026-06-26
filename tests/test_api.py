@@ -4,8 +4,6 @@ import json
 from io import BytesIO
 from unittest.mock import patch
 
-import pytest
-
 from src.core import storage, task_persistence
 
 
@@ -35,11 +33,16 @@ class TestFrontend:
         assert b"Automated Review" in response.data
         assert b"reportShareLink" in response.data
         assert b"selectionSummary" in response.data
+        assert b"personaReviews" in response.data
 
     def test_frontend_static_assets(self, client):
         response = client.get("/ui-static/css/review.css")
         assert response.status_code == 200
         assert b"--accent" in response.data
+
+        marked = client.get("/ui-static/js/marked.min.js")
+        assert marked.status_code == 200
+        assert b"marked" in marked.data
 
 
 class TestPipelinesApi:
@@ -118,7 +121,9 @@ class TestReviewsApi:
         assert response.status_code == 404
 
     def test_start_review_validation(self, client, isolated_workspace):
-        response = client.post("/api/v1/reviews", json={"pipeline_id": "scientific_checklist"})
+        response = client.post(
+            "/api/v1/reviews", json={"pipeline_id": "scientific_checklist"}
+        )
         assert response.status_code == 400
 
     @patch("src.web.api.review_service.multiprocessing.Process")
@@ -189,7 +194,9 @@ class TestReviewsApi:
                 "reasoning": "Found on page 1",
             }
         ]
-        (run_dir / "evaluations.json").write_text(json.dumps(evaluations), encoding="utf-8")
+        (run_dir / "evaluations.json").write_text(
+            json.dumps(evaluations), encoding="utf-8"
+        )
         (run_dir / "synthesis.json").write_text(
             json.dumps({"summary": "Looks good overall."}),
             encoding="utf-8",
@@ -199,8 +206,78 @@ class TestReviewsApi:
         assert response.status_code == 200
         report = response.get_json()
         assert report["status"] == "completed"
-        assert report["artifacts"][0]["evaluations"][0]["criterion_text"] == "Has abstract"
+        assert (
+            report["artifacts"][0]["evaluations"][0]["criterion_text"] == "Has abstract"
+        )
         assert report["artifacts"][0]["synthesis"]["summary"] == "Looks good overall."
+        assert report["artifacts"][0]["overview"]["summary"]["total"] == 1
+
+    def test_report_includes_weighted_overview(self, client, isolated_workspace):
+        from src.review_workflow.engine.run_paths import artifact_run_dir
+
+        collections_root = isolated_workspace / "collections"
+        storage.create_new_collection(collections_root, "report_weighted")
+        task_id = "report-task-weighted"
+        task_persistence.write_task_payload(
+            collections_root,
+            task_id,
+            collection_name="report_weighted",
+            pipeline_id="tender_full",
+            criteria_set_name="extracted",
+            artifacts=[{"filename": "doc.pdf", "artifact_id": "doc"}],
+            progress={
+                "status": "completed",
+                "current": 1,
+                "total": 1,
+                "results": [],
+                "log_messages": [],
+            },
+        )
+
+        run_dir = artifact_run_dir(
+            collections_root,
+            "report_weighted",
+            "tender_full",
+            "doc.pdf",
+            "extracted",
+        )
+        run_dir.mkdir(parents=True, exist_ok=True)
+        criteria_yaml = """
+schema_version: 1
+name: extracted
+criteria:
+  - id: req-1
+    description: Innovation height (Gewichtung 60%).
+    source_ref: 7.2.2-1
+  - id: req-2
+    description: Implementation concept (Gewichtung 40%).
+    source_ref: 7.2.2-3
+"""
+        (run_dir / "criteria.yaml").write_text(criteria_yaml.strip(), encoding="utf-8")
+        (run_dir / "evaluations.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "criterion_id": "req-1",
+                        "criterion_text": "Innovation height",
+                        "answer": True,
+                    },
+                    {
+                        "criterion_id": "req-2",
+                        "criterion_text": "Implementation concept",
+                        "answer": False,
+                    },
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        overview = client.get(f"/api/v1/reviews/{task_id}/report").get_json()[
+            "artifacts"
+        ][0]["overview"]
+        assert overview["summary"]["weighted_total"] == 100.0
+        assert overview["summary"]["weighted_earned"] == 60.0
+        assert overview["rows"][0]["weight_label"] == "60%"
 
     def test_report_loads_evaluations_by_filename(self, client, isolated_workspace):
         from src.review_workflow.engine.run_paths import artifact_run_dir
@@ -215,7 +292,13 @@ class TestReviewsApi:
             pipeline_id="scientific_checklist",
             criteria_set_name="example",
             artifacts=[{"filename": "doc.pdf", "artifact_id": "doc"}],
-            progress={"status": "completed", "current": 1, "total": 1, "results": [], "log_messages": []},
+            progress={
+                "status": "completed",
+                "current": 1,
+                "total": 1,
+                "results": [],
+                "log_messages": [],
+            },
         )
 
         run_dir = artifact_run_dir(
@@ -227,10 +310,15 @@ class TestReviewsApi:
         )
         run_dir.mkdir(parents=True, exist_ok=True)
         (run_dir / "evaluations.json").write_text(
-            json.dumps([{"criterion_id": "c1", "criterion_text": "Has title", "answer": True}]),
+            json.dumps(
+                [{"criterion_id": "c1", "criterion_text": "Has title", "answer": True}]
+            ),
             encoding="utf-8",
         )
 
         response = client.get(f"/api/v1/reviews/{task_id}/report")
         assert response.status_code == 200
-        assert response.get_json()["artifacts"][0]["evaluations"][0]["criterion_text"] == "Has title"
+        assert (
+            response.get_json()["artifacts"][0]["evaluations"][0]["criterion_text"]
+            == "Has title"
+        )

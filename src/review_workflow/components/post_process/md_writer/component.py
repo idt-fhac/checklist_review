@@ -1,16 +1,19 @@
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
-from src.core.criteria import criteria_set_stem
+from pathlib import Path
+from typing import Any, Dict, List
 
+from src.core.criteria import criteria_set_stem
 from src.review_workflow.engine.base import BaseComponent
+
 
 def _slug(name: str) -> str:
     return name.strip().replace(" ", "_").lower() or "process"
 
+
 def _esc(s: str) -> str:
     return (s or "").replace("|", "\\|").replace("\n", " ").strip()
+
 
 class MdWriter(BaseComponent):
     def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -20,11 +23,15 @@ class MdWriter(BaseComponent):
         criteria_set_name = inputs.get("criteria_set_name")
 
         if not all([collection_name, pipeline_name, artifact_name]):
-            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
+            raise ValueError(
+                "Missing required inputs: collection_name, pipeline_name, or artifact_name"
+            )
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
-            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            project_root = (
+                Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            )
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
         paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
@@ -47,7 +54,8 @@ class MdWriter(BaseComponent):
 
         save_details = self.config.get("save_details", False)
         md_content = self._generate_markdown(
-            artifact_name, evaluations,
+            artifact_name,
+            evaluations,
             pipeline_name=pipeline_name or "",
             criteria_set_name=criteria_set_name or "",
             save_details=save_details,
@@ -88,14 +96,22 @@ class MdWriter(BaseComponent):
             md += "| :--- | :---: |\n"
             for item in evaluations:
                 q = _esc(item.get("criterion_text", "N/A"))
-                ans = "Yes" if item.get("answer") in (True, "yes", "true", "Yes", "True") else "No"
+                ans = (
+                    "Yes"
+                    if item.get("answer") in (True, "yes", "true", "Yes", "True")
+                    else "No"
+                )
                 md += f"| {q} | **{ans}** |\n"
             md += "\n"
             return md
 
         for item in evaluations:
             q = _esc(item.get("criterion_text", "N/A"))
-            ans = "Yes" if item.get("answer") in (True, "yes", "true", "Yes", "True") else "No"
+            ans = (
+                "Yes"
+                if item.get("answer") in (True, "yes", "true", "Yes", "True")
+                else "No"
+            )
             md += f"### {q}\n\n"
             md += f"**Answer:** **{ans}**\n\n"
             supporting = item.get("supporting_texts") or []

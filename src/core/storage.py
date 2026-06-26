@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import shutil
 from datetime import datetime
-
-from src.core.criteria import criteria_set_stem
 from pathlib import Path
 from typing import Any, Dict, List
+
+from src.core.criteria import criteria_set_stem
 
 ISO_FORMAT = "%Y-%m-%dT%H-%M-%S"
 META_FILE = "collection.json"
@@ -33,7 +33,9 @@ def _slug(name: str) -> str:
     return name.strip().replace(" ", "_").lower() or "collection"
 
 
-def _collection_dir(collections_root: Path, collection_name: str, create: bool = True) -> Path:
+def _collection_dir(
+    collections_root: Path, collection_name: str, create: bool = True
+) -> Path:
     directory = _collections_root(collections_root) / _slug(collection_name)
     if create:
         directory.mkdir(parents=True, exist_ok=True)
@@ -85,6 +87,7 @@ def _vis_dir(collection_dir: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     return path
 
+
 def _selected_papers_dir(collection_dir: Path) -> Path:
     path = collection_dir / "selected_papers"
     path.mkdir(parents=True, exist_ok=True)
@@ -130,7 +133,9 @@ def _load_selected_from_dir(directory: Path) -> List[Dict[str, Any]]:
                     line = line.strip()
                     if not line:
                         continue
-                    entries.append({"filename": line, "artifact_id": line, "title": line})
+                    entries.append(
+                        {"filename": line, "artifact_id": line, "title": line}
+                    )
                 return entries
         except Exception:
             pass
@@ -139,6 +144,7 @@ def _load_selected_from_dir(directory: Path) -> List[Dict[str, Any]]:
 
 def _criteria_sets_dir(base_dir: Path) -> Path:
     from src.core.workspace import get_criteria_sets_dir
+
     return get_criteria_sets_dir()
 
 
@@ -148,13 +154,15 @@ def _reviews_dir(collection_dir: Path) -> Path:
     return path
 
 
-def save_collection(collections_root: Path, collection_name: str, payload: Dict[str, Any]) -> Path:
+def save_collection(
+    collections_root: Path, collection_name: str, payload: Dict[str, Any]
+) -> Path:
     directory = _collection_dir(collections_root, collection_name)
     _collection_artifacts_dir(directory)
     path = _meta_path(directory)
     if "collection_name" not in payload:
         payload["collection_name"] = collection_name
-    
+
     with path.open("w", encoding="utf-8") as fp:
         json.dump(payload, fp, indent=2)
     return path
@@ -172,7 +180,11 @@ def list_collections(collections_root: Path) -> List[Dict[str, Any]]:
         meta_path = _meta_path(directory)
         if not meta_path.exists():
             meta_path = directory / META_FILE  # legacy
-        updated_at = datetime.fromtimestamp(meta_path.stat().st_mtime) if meta_path.exists() else datetime.fromtimestamp(directory.stat().st_mtime)
+        updated_at = (
+            datetime.fromtimestamp(meta_path.stat().st_mtime)
+            if meta_path.exists()
+            else datetime.fromtimestamp(directory.stat().st_mtime)
+        )
         display_name = directory.name
         if meta_path.exists():
             try:
@@ -182,18 +194,22 @@ def list_collections(collections_root: Path) -> List[Dict[str, Any]]:
                         display_name = meta["collection_name"]
             except Exception:
                 pass
-        items.append({
-            "name": display_name,
-            "slug": directory.name,
-            "path": str(meta_path if meta_path.exists() else directory),
-            "dir": str(directory),
-            "updated_at": updated_at,
-            "selected_files": _load_selected_from_dir(directory),
-        })
+        items.append(
+            {
+                "name": display_name,
+                "slug": directory.name,
+                "path": str(meta_path if meta_path.exists() else directory),
+                "dir": str(directory),
+                "updated_at": updated_at,
+                "selected_files": _load_selected_from_dir(directory),
+            }
+        )
     return items
 
 
-def load_collection(collections_root: Path, collection_name: str) -> Dict[str, Any] | None:
+def load_collection(
+    collections_root: Path, collection_name: str
+) -> Dict[str, Any] | None:
     directory = _collection_dir(collections_root, collection_name, create=False)
     meta_path = _meta_path(directory)
     if not meta_path.exists():
@@ -206,14 +222,14 @@ def load_collection(collections_root: Path, collection_name: str) -> Dict[str, A
             meta_path = directory / META_FILE
         if not meta_path.exists():
             return None
-    
+
     with meta_path.open(encoding="utf-8") as fp:
         data = json.load(fp)
-    
+
     # Load selected files and filter to only include papers that actually exist
     selected_files = _load_selected_from_dir(directory)
     papers = data.get("papers", [])
-    
+
     # Create a set of valid paper identifiers for quick lookup
     valid_artifact_ids = set()
     valid_filenames = set()
@@ -224,15 +240,18 @@ def load_collection(collections_root: Path, collection_name: str) -> Dict[str, A
         filename = paper.get("filename")
         if filename:
             valid_filenames.add(filename)
-    
+
     # Filter selected files to only include papers that exist in collection metadata.
     # When papers is empty (API upload flow), keep selected_papers.json entries as-is.
     if papers:
         filtered_selected = [
-            entry for entry in selected_files
-            if (entry.get("artifact_id") in valid_artifact_ids
+            entry
+            for entry in selected_files
+            if (
+                entry.get("artifact_id") in valid_artifact_ids
                 or entry.get("arxiv_id") in valid_artifact_ids
-                or entry.get("filename") in valid_filenames)
+                or entry.get("filename") in valid_filenames
+            )
         ]
         if len(filtered_selected) != len(selected_files):
             save_selected_list(collections_root, collection_name, filtered_selected)
@@ -242,7 +261,9 @@ def load_collection(collections_root: Path, collection_name: str) -> Dict[str, A
     return data
 
 
-def save_plot(collections_root: Path, collection_name: str, plot_payload: Dict[str, Any]) -> Path:
+def save_plot(
+    collections_root: Path, collection_name: str, plot_payload: Dict[str, Any]
+) -> Path:
     directory = _collection_dir(collections_root, collection_name)
     _collection_artifacts_dir(directory)
     path = _collection_emb_path(directory)
@@ -255,7 +276,9 @@ def load_plot(collections_root: Path, collection_name: str) -> Dict[str, Any] | 
     directory = _collection_dir(collections_root, collection_name, create=False)
     path = _collection_emb_path(directory)
     if not path.exists():
-        path = directory / COLLECTION_ARTIFACTS_DIR / "selected_papers_emb.json"  # legacy name
+        path = (
+            directory / COLLECTION_ARTIFACTS_DIR / "selected_papers_emb.json"
+        )  # legacy name
     if not path.exists():
         path = directory / "vis" / "embs.json"  # legacy
     if not path.exists():
@@ -269,14 +292,18 @@ def load_plot(collections_root: Path, collection_name: str) -> Dict[str, Any] | 
         return None
 
 
-def get_visualization_status(collections_root: Path, collection_name: str) -> Dict[str, Any]:
+def get_visualization_status(
+    collections_root: Path, collection_name: str
+) -> Dict[str, Any]:
     directory = _collection_dir(collections_root, collection_name, create=False)
     meta_path = _meta_path(directory)
     if not meta_path.exists():
         meta_path = directory / META_FILE  # legacy
     plot_path = _collection_emb_path(directory)
     if not plot_path.exists():
-        plot_path = directory / COLLECTION_ARTIFACTS_DIR / "selected_papers_emb.json"  # legacy name
+        plot_path = (
+            directory / COLLECTION_ARTIFACTS_DIR / "selected_papers_emb.json"
+        )  # legacy name
     if not plot_path.exists():
         plot_path = directory / "vis" / "embs.json"  # legacy
     if not plot_path.exists():
@@ -288,11 +315,13 @@ def get_visualization_status(collections_root: Path, collection_name: str) -> Di
     is_stale = meta_mtime > plot_mtime
     return {
         "status": "stale" if is_stale else "ok",
-        "message": "Visualization might be outdated." if is_stale else "Up to date."
+        "message": "Visualization might be outdated." if is_stale else "Up to date.",
     }
 
 
-def save_checklist(collections_root: Path, collection_name: str, checklist: List[Dict[str, Any]]) -> Path:
+def save_checklist(
+    collections_root: Path, collection_name: str, checklist: List[Dict[str, Any]]
+) -> Path:
     """Save checklist to global workspaces/guest/checklists directory"""
     timestamp = datetime.utcnow().strftime(ISO_FORMAT)
     # Get base directory (project root)
@@ -307,19 +336,21 @@ def list_criteria_sets(base_dir: Path) -> List[Dict[str, Any]]:
     """List all checklists from workspaces/guest/checklists directory (global, not per collection)"""
     items: List[Dict[str, Any]] = []
     criteria_set_dir = _criteria_sets_dir(base_dir)
-    
+
     if not criteria_set_dir.exists():
         return items
-    
+
     # Only list JSON files (no PDF support)
     for yaml_file in sorted(criteria_set_dir.glob("*.yaml")):
         stem = yaml_file.stem
-        items.append({
-            "name": stem,
-            "path": str(yaml_file),
-            "created_at": datetime.fromtimestamp(yaml_file.stat().st_mtime),
-        })
-    
+        items.append(
+            {
+                "name": stem,
+                "path": str(yaml_file),
+                "created_at": datetime.fromtimestamp(yaml_file.stat().st_mtime),
+            }
+        )
+
     return items
 
 
@@ -336,7 +367,9 @@ def load_checklist(path: str) -> List[Dict[str, Any]]:
     return []
 
 
-def save_review(collections_root: Path, checklist_identifier: str, payload: Dict[str, Any]) -> Path:
+def save_review(
+    collections_root: Path, checklist_identifier: str, payload: Dict[str, Any]
+) -> Path:
     """Save review - checklist_identifier can be a checklist name or path"""
     timestamp = datetime.utcnow().strftime(ISO_FORMAT)
     checklist_path = Path(checklist_identifier)
@@ -354,7 +387,9 @@ def save_review(collections_root: Path, checklist_identifier: str, payload: Dict
     return path
 
 
-def save_selected_list(collections_root: Path, collection_name: str, entries: List[Dict[str, Any]]) -> Path:
+def save_selected_list(
+    collections_root: Path, collection_name: str, entries: List[Dict[str, Any]]
+) -> Path:
     directory = _collection_dir(collections_root, collection_name)
     _collection_artifacts_dir(directory)
     path = _selected_papers_file_path(directory)
@@ -363,14 +398,18 @@ def save_selected_list(collections_root: Path, collection_name: str, entries: Li
     return path
 
 
-def load_selected_list(collections_root: Path, collection_name: str) -> List[Dict[str, Any]]:
+def load_selected_list(
+    collections_root: Path, collection_name: str
+) -> List[Dict[str, Any]]:
     directory = _collection_dir(collections_root, collection_name, create=False)
     if not directory.exists():
         return []
     return _load_selected_from_dir(directory)
 
 
-def list_selected_files(collections_root: Path, collection_name: str) -> List[Dict[str, Any]]:
+def list_selected_files(
+    collections_root: Path, collection_name: str
+) -> List[Dict[str, Any]]:
     directory = _collection_dir(collections_root, collection_name, create=False)
     selected_files = _load_selected_from_dir(directory)
     results: List[Dict[str, Any]] = []
@@ -379,14 +418,19 @@ def list_selected_files(collections_root: Path, collection_name: str) -> List[Di
         filename = entry.get("filename")
         if not filename:
             continue
-        pdf_path = pdf_dir / filename if pdf_dir.exists() else directory / "source" / filename  # legacy
-        results.append({
-            "filename": filename,
-            "pdf_path": str(pdf_path),
-            "title": entry.get("title"),
-            "artifact_id": entry.get("artifact_id"),
-        })
+        pdf_path = (
+            pdf_dir / filename if pdf_dir.exists() else directory / "source" / filename
+        )  # legacy
+        results.append(
+            {
+                "filename": filename,
+                "pdf_path": str(pdf_path),
+                "title": entry.get("title"),
+                "artifact_id": entry.get("artifact_id"),
+            }
+        )
     return results
+
 
 def create_new_collection(collections_root: Path, name: str | None = None) -> str:
     root = _collections_root(collections_root)
@@ -404,15 +448,20 @@ def create_new_collection(collections_root: Path, name: str | None = None) -> st
     _source_metadata_dir(directory)
     _source_md_dir(directory)
     _collection_artifacts_dir(directory)
-    save_collection(collections_root, name, {
-        "collection_name": original_name,
-        "source_folder": SOURCE_PDF_DIR,
-        "papers": [],
-        "generated_at": datetime.utcnow().isoformat()
-    })
+    save_collection(
+        collections_root,
+        name,
+        {
+            "collection_name": original_name,
+            "source_folder": SOURCE_PDF_DIR,
+            "papers": [],
+            "generated_at": datetime.utcnow().isoformat(),
+        },
+    )
     # Process definitions are now global, so we don't create process_definitions directory in collections
-        
+
     return original_name
+
 
 def rename_collection(collections_root: Path, old_name: str, new_name: str) -> bool:
     old_dir = _collection_dir(collections_root, old_name, create=False)
@@ -421,10 +470,10 @@ def rename_collection(collections_root: Path, old_name: str, new_name: str) -> b
         old_dir = _collections_root(collections_root) / old_slug
         if not old_dir.exists():
             return False
-    
+
     new_slug = _slug(new_name)
     new_dir = _collections_root(collections_root) / new_slug
-    
+
     if new_dir.exists():
         return False
     shutil.move(str(old_dir), str(new_dir))
@@ -433,8 +482,9 @@ def rename_collection(collections_root: Path, old_name: str, new_name: str) -> b
         payload["collection_name"] = new_name
         payload["source_folder"] = SOURCE_PDF_DIR
         save_collection(collections_root, new_slug, payload)
-        
+
     return True
+
 
 def delete_collection(collections_root: Path, collection_name: str) -> bool:
     directory = _collection_dir(collections_root, collection_name, create=False)
@@ -444,7 +494,9 @@ def delete_collection(collections_root: Path, collection_name: str) -> bool:
     return False
 
 
-def migrate_collection_to_new_structure(collections_root: Path, collection_name: str) -> bool:
+def migrate_collection_to_new_structure(
+    collections_root: Path, collection_name: str
+) -> bool:
     """
     Migrate a collection from the old layout (source/, source_extracted/, collection.json at root,
     selected_papers/list.json, vis/embs.json) to the new layout (source/pdf, source/metadata, source/md,
@@ -467,7 +519,9 @@ def migrate_collection_to_new_structure(collections_root: Path, collection_name:
                 if fn:
                     p["file_path"] = f"{SOURCE_PDF_DIR}/{fn}"
         payload["source_folder"] = SOURCE_PDF_DIR
-        (artifacts_dir / META_FILE).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        (artifacts_dir / META_FILE).write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
         legacy_meta.unlink()
     old_selected = directory / "selected_papers" / "list.json"
     if old_selected.exists():
@@ -574,26 +628,36 @@ def remove_paper_from_review_runs(
                         pass
 
 
-def remove_paper(collections_root: Path, collection_name: str, artifact_id: str) -> bool:
+def remove_paper(
+    collections_root: Path, collection_name: str, artifact_id: str
+) -> bool:
     payload = load_collection(collections_root, collection_name)
     if not payload:
         return False
-    
+
     papers = payload.get("papers", [])
-    target = next((p for p in papers if p.get("artifact_id") == artifact_id or p.get("arxiv_id") == artifact_id), None)
-    
+    target = next(
+        (
+            p
+            for p in papers
+            if p.get("artifact_id") == artifact_id or p.get("arxiv_id") == artifact_id
+        ),
+        None,
+    )
+
     new_papers = [
-        p for p in papers 
+        p
+        for p in papers
         if p.get("artifact_id") != artifact_id and p.get("arxiv_id") != artifact_id
     ]
-    
+
     if len(papers) == len(new_papers):
         return False
     if target:
         filename = target.get("filename") or Path(target.get("file_path", "")).name
         if filename:
             directory = _collection_dir(collections_root, collection_name, create=False)
-            
+
             # Delete PDF and extracted files (new layout: source/pdf, source/md, source/metadata)
             pdf_stem = Path(filename).stem
             source_file = _source_pdf_dir(directory, create=False) / filename
@@ -623,40 +687,48 @@ def remove_paper(collections_root: Path, collection_name: str, artifact_id: str)
             # Legacy: source_extracted
             legacy_extracted = directory / "source_extracted"
             if legacy_extracted.exists():
-                for f in (legacy_extracted / f"{pdf_stem}.md", legacy_extracted / f"{pdf_stem}.json"):
+                for f in (
+                    legacy_extracted / f"{pdf_stem}.md",
+                    legacy_extracted / f"{pdf_stem}.json",
+                ):
                     if f.exists():
                         try:
                             f.unlink()
                         except Exception:
                             pass
-            
+
             # Remove paper from selected files list
             selected_files = load_selected_list(collections_root, collection_name)
             if selected_files:
                 # Remove entries matching artifact_id, arxiv_id, or filename
                 updated_selected = [
-                    entry for entry in selected_files
+                    entry
+                    for entry in selected_files
                     if entry.get("artifact_id") != artifact_id
                     and entry.get("arxiv_id") != artifact_id
                     and entry.get("filename") != filename
                 ]
                 if len(updated_selected) != len(selected_files):
                     # Only save if something was removed
-                    save_selected_list(collections_root, collection_name, updated_selected)
+                    save_selected_list(
+                        collections_root, collection_name, updated_selected
+                    )
 
             remove_paper_from_review_runs(collections_root, collection_name, filename)
 
     payload["papers"] = new_papers
     save_collection(collections_root, collection_name, payload)
-    
+
     # Remove paper from all review_runs (including when target had no filename)
     paper_filename = None
     if target:
-        paper_filename = target.get("filename") or Path(target.get("file_path", "")).name
+        paper_filename = (
+            target.get("filename") or Path(target.get("file_path", "")).name
+        )
     if not paper_filename:
         paper_filename = artifact_id
     remove_paper_from_review_runs(collections_root, collection_name, paper_filename)
-    
+
     return True
 
 
@@ -664,26 +736,26 @@ def remove_all_papers(collections_root: Path, collection_name: str) -> bool:
     """
     Remove all papers from a collection.
     Deletes all PDF files, extracted markdown/JSON files, and clears selected files.
-    
+
     Args:
         collections_root: Root directory for collections
         collection_name: Name of the collection
-        
+
     Returns:
         True if successful, False otherwise
     """
     payload = load_collection(collections_root, collection_name)
     if not payload:
         return False
-    
+
     papers = payload.get("papers", [])
     if not papers:
         return True  # Already empty
-    
+
     directory = _collection_dir(collections_root, collection_name, create=False)
     if not directory.exists():
         return False
-    
+
     pdf_dir = _source_pdf_dir(directory, create=False)
     md_dir = _source_md_dir(directory, create=False)
     meta_dir = _source_metadata_dir(directory, create=False)
@@ -724,17 +796,17 @@ def remove_all_papers(collections_root: Path, collection_name: str) -> bool:
                 except Exception:
                     pass
         remove_paper_from_review_runs(collections_root, collection_name, filename)
-    
+
     # Clear selected files list
     try:
         save_selected_list(collections_root, collection_name, [])
     except Exception:
         pass
-    
+
     # Update collection payload
     payload["papers"] = []
     save_collection(collections_root, collection_name, payload)
-    
+
     return True
 
 
@@ -747,6 +819,7 @@ def _generated_dir(collection_dir: Path) -> Path:
 # Global process definitions (config/pipelines)
 def _global_processes_dir(base_dir: Path) -> Path:
     from src.core.config_loader import get_repo_config_dir
+
     return get_repo_config_dir() / "pipelines"
 
 
@@ -798,19 +871,24 @@ def delete_global_process(base_dir: Path, pipeline_id: str) -> bool:
     return False
 
 
-def list_evaluations(collections_root: Path, collection_name: str, pipeline_id: str = None, criteria_set_name: str = None) -> List[Dict[str, Any]]:
+def list_evaluations(
+    collections_root: Path,
+    collection_name: str,
+    pipeline_id: str = None,
+    criteria_set_name: str = None,
+) -> List[Dict[str, Any]]:
     directory = _collection_dir(collections_root, collection_name, create=False)
     if not directory.exists():
         return []
-    
+
     if not pipeline_id:
-         return []
+        return []
     proc_dir = directory / "review_runs" / _slug(pipeline_id)
     if not proc_dir.exists():
         proc_dir = directory / "review_runs" / pipeline_id
     if not proc_dir.exists():
         return []
-    
+
     # If criteria_set_name is provided, look in checklist subdirectory
     if criteria_set_name:
         criteria_set_name_clean = criteria_set_stem(criteria_set_name)
@@ -820,22 +898,26 @@ def list_evaluations(collections_root: Path, collection_name: str, pipeline_id: 
         if not criteria_set_dir.exists():
             return []
         proc_dir = criteria_set_dir
-        
+
     results = []
     for paper_dir in sorted(proc_dir.iterdir()):
         if not paper_dir.is_dir():
-             continue
-             
+            continue
+
         answers_file = paper_dir / "evaluations.json"
         if answers_file.exists():
-             results.append({
-                "artifact_id": paper_dir.name, 
-                "filename": paper_dir.name,
-                "path": str(answers_file),
-                "generated_at": datetime.fromtimestamp(answers_file.stat().st_mtime),
-                "status": "completed"
-            })
-            
+            results.append(
+                {
+                    "artifact_id": paper_dir.name,
+                    "filename": paper_dir.name,
+                    "path": str(answers_file),
+                    "generated_at": datetime.fromtimestamp(
+                        answers_file.stat().st_mtime
+                    ),
+                    "status": "completed",
+                }
+            )
+
     return results
 
 
@@ -875,7 +957,9 @@ def get_review_outputs_dir(
     artifact_id: str,
 ) -> Path | None:
     """Return the outputs/ directory for a given review result, or None if it does not exist."""
-    paper_dir = get_review_paper_dir(collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id)
+    paper_dir = get_review_paper_dir(
+        collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id
+    )
     if not paper_dir:
         return None
     outputs_dir = paper_dir / "outputs"
@@ -890,7 +974,9 @@ def list_review_outputs(
     artifact_id: str,
 ) -> List[Dict[str, Any]]:
     """List files in the outputs/ folder for a review result. Returns list of {name, type} (type: 'md'|'pdf'|'json'|'other')."""
-    outputs_dir = get_review_outputs_dir(collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id)
+    outputs_dir = get_review_outputs_dir(
+        collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id
+    )
     if not outputs_dir:
         return []
     result = []
@@ -911,15 +997,21 @@ def list_review_outputs(
     return result
 
 
-def load_evaluation(collections_root: Path, collection_name: str, artifact_id: str, pipeline_id: str = None, criteria_set_name: str = None) -> Dict[str, Any] | None:
+def load_evaluation(
+    collections_root: Path,
+    collection_name: str,
+    artifact_id: str,
+    pipeline_id: str = None,
+    criteria_set_name: str = None,
+) -> Dict[str, Any] | None:
     directory = _collection_dir(collections_root, collection_name, create=False)
-    
+
     if pipeline_id:
         # Build base path
         base_path = directory / "review_runs" / _slug(pipeline_id)
         if not base_path.exists():
             base_path = directory / "review_runs" / pipeline_id
-        
+
         # If criteria_set_name is provided, add it to the path
         if criteria_set_name:
             criteria_set_name_clean = criteria_set_name
@@ -927,20 +1019,32 @@ def load_evaluation(collections_root: Path, collection_name: str, artifact_id: s
             base_path = base_path / _slug(criteria_set_name_clean)
             if not base_path.exists():
                 base_path = base_path.parent / criteria_set_name_clean
-        
+
         # Try slug first (since data is saved with slugs), then exact match for backward compatibility
         path = base_path / artifact_id / "evaluations.json"
         if not path.exists():
             # Try without checklist for backward compatibility
-            path = directory / "review_runs" / _slug(pipeline_id) / artifact_id / "evaluations.json"
+            path = (
+                directory
+                / "review_runs"
+                / _slug(pipeline_id)
+                / artifact_id
+                / "evaluations.json"
+            )
             if not path.exists():
-                path = directory / "review_runs" / pipeline_id / artifact_id / "evaluations.json"
+                path = (
+                    directory
+                    / "review_runs"
+                    / pipeline_id
+                    / artifact_id
+                    / "evaluations.json"
+                )
     else:
         path = _generated_dir(directory) / f"{artifact_id}.json"
-        
+
     if not path.exists():
         return None
-        
+
     try:
         with path.open(encoding="utf-8") as fp:
             return json.load(fp)
@@ -948,15 +1052,21 @@ def load_evaluation(collections_root: Path, collection_name: str, artifact_id: s
         return None
 
 
-def delete_evaluation(collections_root: Path, collection_name: str, artifact_id: str, pipeline_id: str = None, criteria_set_name: str = None) -> bool:
+def delete_evaluation(
+    collections_root: Path,
+    collection_name: str,
+    artifact_id: str,
+    pipeline_id: str = None,
+    criteria_set_name: str = None,
+) -> bool:
     directory = _collection_dir(collections_root, collection_name, create=False)
-    
+
     if pipeline_id:
         # Build base path
         base_path = directory / "review_runs" / _slug(pipeline_id)
         if not base_path.exists():
             base_path = directory / "review_runs" / pipeline_id
-        
+
         # If criteria_set_name is provided, add it to the path
         if criteria_set_name:
             criteria_set_name_clean = criteria_set_name
@@ -964,7 +1074,7 @@ def delete_evaluation(collections_root: Path, collection_name: str, artifact_id:
             base_path = base_path / _slug(criteria_set_name_clean)
             if not base_path.exists():
                 base_path = base_path.parent / criteria_set_name_clean
-        
+
         # Try slug first (since data is saved with slugs), then exact match for backward compatibility
         paper_folder = base_path / artifact_id
         if not paper_folder.exists():
@@ -973,16 +1083,16 @@ def delete_evaluation(collections_root: Path, collection_name: str, artifact_id:
             if not paper_folder.exists():
                 paper_folder = directory / "review_runs" / pipeline_id / artifact_id
     else:
-         gen_dir = _generated_dir(directory)
-         path = gen_dir / f"{artifact_id}.json"
-         if path.exists():
-             try:
-                 path.unlink()
-                 return True
-             except:
-                 return False
-         return False
-    
+        gen_dir = _generated_dir(directory)
+        path = gen_dir / f"{artifact_id}.json"
+        if path.exists():
+            try:
+                path.unlink()
+                return True
+            except:
+                return False
+        return False
+
     # Delete the entire paper folder
     if paper_folder.exists() and paper_folder.is_dir():
         try:
@@ -992,7 +1102,10 @@ def delete_evaluation(collections_root: Path, collection_name: str, artifact_id:
             return False
     return False
 
-def rename_process_folders(collections_root: Path, old_pipeline_id: str, new_pipeline_id: str) -> Dict[str, Any]:
+
+def rename_process_folders(
+    collections_root: Path, old_pipeline_id: str, new_pipeline_id: str
+) -> Dict[str, Any]:
     """
     Rename process folders in all collections when a process is renamed.
     Returns a dict with 'renamed' (list of successful renames) and 'errors' (list of errors).
@@ -1000,40 +1113,42 @@ def rename_process_folders(collections_root: Path, old_pipeline_id: str, new_pip
     result = {"renamed": [], "errors": []}
     old_slug = _slug(old_pipeline_id)
     new_slug = _slug(new_pipeline_id)
-    
+
     # If slugs are the same, no rename needed (just display name change)
     if old_slug == new_slug:
         return result
-    
+
     collections_root_path = _collections_root(collections_root)
     if not collections_root_path.exists():
         return result
-    
+
     for collection_dir in collections_root_path.iterdir():
         if not collection_dir.is_dir():
             continue
-        
+
         review_runs_dir = collection_dir / "review_runs"
         if not review_runs_dir.exists():
             continue
-        
+
         # Try both slug and exact name for old folder
         old_folder = review_runs_dir / old_slug
         if not old_folder.exists():
             old_folder = review_runs_dir / old_pipeline_id
-        
+
         if old_folder.exists() and old_folder.is_dir():
             new_folder = review_runs_dir / new_slug
             if new_folder.exists():
-                result["errors"].append(f"Collection {collection_dir.name}: target folder already exists")
+                result["errors"].append(
+                    f"Collection {collection_dir.name}: target folder already exists"
+                )
                 continue
-            
+
             try:
                 old_folder.rename(new_folder)
                 result["renamed"].append(collection_dir.name)
             except Exception as e:
                 result["errors"].append(f"Collection {collection_dir.name}: {str(e)}")
-    
+
     return result
 
 
@@ -1044,35 +1159,37 @@ def delete_process_folders(collections_root: Path, pipeline_id: str) -> Dict[str
     """
     result = {"deleted": [], "errors": []}
     process_slug = _slug(pipeline_id)
-    
+
     collections_root_path = _collections_root(collections_root)
     if not collections_root_path.exists():
         return result
-    
+
     for collection_dir in collections_root_path.iterdir():
         if not collection_dir.is_dir():
             continue
-        
+
         review_runs_dir = collection_dir / "review_runs"
         if not review_runs_dir.exists():
             continue
-        
+
         # Try both slug and exact name
         process_folder = review_runs_dir / process_slug
         if not process_folder.exists():
             process_folder = review_runs_dir / pipeline_id
-        
+
         if process_folder.exists() and process_folder.is_dir():
             try:
                 shutil.rmtree(process_folder)
                 result["deleted"].append(collection_dir.name)
             except Exception as e:
                 result["errors"].append(f"Collection {collection_dir.name}: {str(e)}")
-    
+
     return result
 
 
-def rename_checklist_folders(collections_root: Path, old_criteria_set_name: str, new_criteria_set_name: str) -> Dict[str, Any]:
+def rename_checklist_folders(
+    collections_root: Path, old_criteria_set_name: str, new_criteria_set_name: str
+) -> Dict[str, Any]:
     """
     Rename checklist folders in all collections and all processes when a checklist is renamed.
     Returns a dict with 'renamed' (list of successful renames) and 'errors' (list of errors).
@@ -1080,108 +1197,137 @@ def rename_checklist_folders(collections_root: Path, old_criteria_set_name: str,
     result = {"renamed": [], "errors": []}
     old_slug = _slug(old_criteria_set_name)
     new_slug = _slug(new_criteria_set_name)
-    
+
     # If slugs are the same, no rename needed (just display name change)
     if old_slug == new_slug:
         return result
-    
+
     collections_root_path = _collections_root(collections_root)
     if not collections_root_path.exists():
         return result
-    
+
     for collection_dir in collections_root_path.iterdir():
         if not collection_dir.is_dir():
             continue
-        
+
         review_runs_dir = collection_dir / "review_runs"
         if not review_runs_dir.exists():
             continue
-        
+
         # Iterate through all process folders
         for process_dir in review_runs_dir.iterdir():
             if not process_dir.is_dir():
                 continue
-            
+
             # Try both slug and exact name for old checklist folder
             old_checklist_folder = process_dir / old_slug
             if not old_checklist_folder.exists():
                 old_checklist_folder = process_dir / old_criteria_set_name
-            
+
             if old_checklist_folder.exists() and old_checklist_folder.is_dir():
                 new_checklist_folder = process_dir / new_slug
                 if new_checklist_folder.exists():
-                    result["errors"].append(f"Collection {collection_dir.name}, Process {process_dir.name}: target folder already exists")
+                    result["errors"].append(
+                        f"Collection {collection_dir.name}, Process {process_dir.name}: target folder already exists"
+                    )
                     continue
-                
+
                 try:
                     old_checklist_folder.rename(new_checklist_folder)
-                    result["renamed"].append(f"{collection_dir.name}/{process_dir.name}")
+                    result["renamed"].append(
+                        f"{collection_dir.name}/{process_dir.name}"
+                    )
                 except Exception as e:
-                    result["errors"].append(f"Collection {collection_dir.name}, Process {process_dir.name}: {str(e)}")
-    
+                    result["errors"].append(
+                        f"Collection {collection_dir.name}, Process {process_dir.name}: {str(e)}"
+                    )
+
     return result
 
 
-def delete_checklist_folders(collections_root: Path, criteria_set_name: str) -> Dict[str, Any]:
+def delete_checklist_folders(
+    collections_root: Path, criteria_set_name: str
+) -> Dict[str, Any]:
     """
     Delete checklist folders in all collections and all processes when a checklist is deleted.
     Returns a dict with 'deleted' (list of successful deletions) and 'errors' (list of errors).
     """
     result = {"deleted": [], "errors": []}
     checklist_slug = _slug(criteria_set_name)
-    
+
     collections_root_path = _collections_root(collections_root)
     if not collections_root_path.exists():
         return result
-    
+
     for collection_dir in collections_root_path.iterdir():
         if not collection_dir.is_dir():
             continue
-        
+
         review_runs_dir = collection_dir / "review_runs"
         if not review_runs_dir.exists():
             continue
-        
+
         # Iterate through all process folders
         for process_dir in review_runs_dir.iterdir():
             if not process_dir.is_dir():
                 continue
-            
+
             # Try both slug and exact name
             checklist_folder = process_dir / checklist_slug
             if not checklist_folder.exists():
                 checklist_folder = process_dir / criteria_set_name
-            
+
             if checklist_folder.exists() and checklist_folder.is_dir():
                 try:
                     shutil.rmtree(checklist_folder)
-                    result["deleted"].append(f"{collection_dir.name}/{process_dir.name}")
+                    result["deleted"].append(
+                        f"{collection_dir.name}/{process_dir.name}"
+                    )
                 except Exception as e:
-                    result["errors"].append(f"Collection {collection_dir.name}, Process {process_dir.name}: {str(e)}")
-    
+                    result["errors"].append(
+                        f"Collection {collection_dir.name}, Process {process_dir.name}: {str(e)}"
+                    )
+
     return result
 
 
-def process_result_exists(collections_root: Path, collection_name: str, pipeline_id: str, artifact_name: str, criteria_set_name: str = None) -> bool:
+def process_result_exists(
+    collections_root: Path,
+    collection_name: str,
+    pipeline_id: str,
+    artifact_name: str,
+    criteria_set_name: str = None,
+) -> bool:
     directory = _collection_dir(collections_root, collection_name, create=False)
-    
+
     # Build base path
     base_path = directory / "review_runs" / _slug(pipeline_id)
     if not base_path.exists():
         base_path = directory / "review_runs" / pipeline_id
-    
+
     # If criteria_set_name is provided, add it to the path
     if criteria_set_name:
         criteria_set_name_clean = criteria_set_stem(criteria_set_name)
         base_path = base_path / _slug(criteria_set_name_clean)
         if not base_path.exists():
             base_path = base_path.parent / criteria_set_name_clean
-    
+
     path = base_path / artifact_name / "evaluations.json"
     if not path.exists():
         # Try without checklist for backward compatibility
-        path = directory / "review_runs" / _slug(pipeline_id) / artifact_name / "evaluations.json"
+        path = (
+            directory
+            / "review_runs"
+            / _slug(pipeline_id)
+            / artifact_name
+            / "evaluations.json"
+        )
         if not path.exists():
-            path = directory / "review_runs" / pipeline_id / artifact_name / "evaluations.json"
+            path = (
+                directory
+                / "review_runs"
+                / pipeline_id
+                / artifact_name
+                / "evaluations.json"
+            )
     return path.exists()
-

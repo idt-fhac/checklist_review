@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import platform
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -25,7 +25,9 @@ def _choose_directory_macos() -> str:
         text=True,
     )
     if result.returncode != 0:
-        raise FolderSelectionError(result.stderr.strip() or "Folder selection cancelled.")
+        raise FolderSelectionError(
+            result.stderr.strip() or "Folder selection cancelled."
+        )
     path = result.stdout.strip()
     if not path:
         raise FolderSelectionError("Folder selection cancelled.")
@@ -65,7 +67,9 @@ def choose_directory() -> FolderSelection:
         else:
             selected_path = _choose_directory_tk_subprocess()
     except FileNotFoundError as exc:
-        raise FolderSelectionError("Folder picker utility not available on this system.") from exc
+        raise FolderSelectionError(
+            "Folder picker utility not available on this system."
+        ) from exc
     except Exception as exc:
         raise FolderSelectionError(str(exc)) from exc
 

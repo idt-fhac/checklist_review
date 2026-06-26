@@ -4,7 +4,8 @@ One accumulator per paper review; use add() after each Strands agent response.
 Usage: response.metrics.accumulated_usage (dict with inputTokens, outputTokens, totalTokens).
 Model id: agent.model.config.get("model_id") (e.g. "openai/gpt-oss-120b").
 """
-from typing import Dict, Any
+
+from typing import Any, Dict
 
 
 def create_accumulator() -> Dict[str, Any]:
@@ -36,12 +37,16 @@ def add(accumulator: Dict[str, Any], response: Any, agent: Any) -> None:
     if inp == 0 and out == 0 and total == 0:
         return
     config = getattr(getattr(agent, "model", None), "config", None) or {}
-    model_id = config.get("model_id", "unknown") if isinstance(config, dict) else "unknown"
+    model_id = (
+        config.get("model_id", "unknown") if isinstance(config, dict) else "unknown"
+    )
     accumulator["total_input_tokens"] = accumulator.get("total_input_tokens", 0) + inp
     accumulator["total_output_tokens"] = accumulator.get("total_output_tokens", 0) + out
     accumulator["total_tokens"] = accumulator.get("total_tokens", 0) + total
     by_model = accumulator.setdefault("by_model", {})
-    entry = by_model.setdefault(model_id, {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})
+    entry = by_model.setdefault(
+        model_id, {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+    )
     entry["input_tokens"] = entry.get("input_tokens", 0) + inp
     entry["output_tokens"] = entry.get("output_tokens", 0) + out
     entry["total_tokens"] = entry.get("total_tokens", 0) + total

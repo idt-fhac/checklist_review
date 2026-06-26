@@ -7,7 +7,6 @@ from src.review_workflow.engine.evaluation_merger import (
     normalize_persona_weights,
 )
 
-
 PERSONAS = [
     {"id": "critic", "label": "Critic", "weight": 0.35},
     {"id": "expert", "label": "Expert", "weight": 0.35},
@@ -66,8 +65,16 @@ class TestMergeCriterionResults:
     def test_string_answers_normalized(self):
         merged = merge_criterion_results(
             {
-                "critic": {"criterion_id": "r1", "criterion_text": "X", "answer": "met"},
-                "expert": {"criterion_id": "r1", "criterion_text": "X", "answer": "not met"},
+                "critic": {
+                    "criterion_id": "r1",
+                    "criterion_text": "X",
+                    "answer": "met",
+                },
+                "expert": {
+                    "criterion_id": "r1",
+                    "criterion_text": "X",
+                    "answer": "not met",
+                },
             },
             PERSONAS[:2],
             merge_strategy="weighted",

@@ -3,6 +3,7 @@ File-based persistence for review tasks so that:
 - The review can run in a separate process (survives Flask reload).
 - Progress can be read after parent process restarts.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,6 +25,7 @@ def _as_datetime(v: Any):
     if isinstance(v, str):
         try:
             from datetime import datetime
+
             return datetime.fromisoformat(v.replace("Z", "+00:00"))
         except Exception:
             pass
@@ -38,7 +40,9 @@ class _ProgressView:
         self.total = d.get("total", 0)
         self.current_item = d.get("current_item") or ""
         status_val = d.get("status", "pending")
-        self.status = TaskStatus(status_val) if isinstance(status_val, str) else status_val
+        self.status = (
+            TaskStatus(status_val) if isinstance(status_val, str) else status_val
+        )
         self.error = d.get("error")
         self.started_at = _as_datetime(d.get("started_at"))
         self.completed_at = _as_datetime(d.get("completed_at"))
@@ -53,13 +57,18 @@ class TaskView:
         self.task_id = task_id
         self.progress = _ProgressView(progress)
 
+
 TASK_DIR_NAME = ".review_tasks"
 
 
 def _task_dir(collections_root: Path) -> Path:
     # collections_root is typically workspaces/guest/collections
     # We want .review_tasks to be in workspaces/guest/.review_tasks
-    base_dir = Path(collections_root).parent if Path(collections_root).name == "collections" else Path(collections_root)
+    base_dir = (
+        Path(collections_root).parent
+        if Path(collections_root).name == "collections"
+        else Path(collections_root)
+    )
     d = base_dir / TASK_DIR_NAME
     d.mkdir(parents=True, exist_ok=True)
     return d
@@ -92,7 +101,8 @@ def write_task_payload(
         "pipeline_id": pipeline_id,
         "criteria_set_name": criteria_set_name,
         "artifacts": artifacts,
-        "progress": progress or {
+        "progress": progress
+        or {
             "current": 0,
             "total": len(artifacts),
             "current_item": "",

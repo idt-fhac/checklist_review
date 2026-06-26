@@ -25,7 +25,9 @@ def parse_markdown_sections(md_content: str) -> List[Dict[str, Any]]:
 
     for index, match in enumerate(matches):
         start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(md_content)
+        end = (
+            matches[index + 1].start() if index + 1 < len(matches) else len(md_content)
+        )
         heading = match.group(2).strip()
         content = md_content[start:end].strip()
         sections.append(
@@ -75,7 +77,9 @@ def match_criterion_to_sections(
     return headings, excerpt.strip()
 
 
-def build_section_mapping(criteria: List[Dict[str, Any]], md_content: str) -> Dict[str, Any]:
+def build_section_mapping(
+    criteria: List[Dict[str, Any]], md_content: str
+) -> Dict[str, Any]:
     sections = parse_markdown_sections(md_content)
     mappings = []
     for criterion in criteria:
@@ -110,7 +114,9 @@ class SectionMapper(BaseComponent):
         )
         md_path = run_dir / "artifact_content.md"
         if not md_path.exists():
-            raise FileNotFoundError(f"Artifact markdown not found for section mapping: {md_path}")
+            raise FileNotFoundError(
+                f"Artifact markdown not found for section mapping: {md_path}"
+            )
 
         strategy = (self.config.get("strategy") or "heading_match").lower()
         if strategy != "heading_match":
@@ -122,11 +128,11 @@ class SectionMapper(BaseComponent):
         mapping_path.write_text(json.dumps(mapping_doc, indent=2), encoding="utf-8")
 
         if log_callback:
-            log_callback(f"Mapped {len(mapping_doc['mappings'])} criteria to sections", "info")
+            log_callback(
+                f"Mapped {len(mapping_doc['mappings'])} criteria to sections", "info"
+            )
 
-        mapping_index = {
-            item["criterion_id"]: item for item in mapping_doc["mappings"]
-        }
+        mapping_index = {item["criterion_id"]: item for item in mapping_doc["mappings"]}
         return {
             "status": "completed",
             "mapping_file": str(mapping_path),

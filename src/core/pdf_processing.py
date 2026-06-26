@@ -20,11 +20,16 @@ except ImportError:
     pymupdf = None
     pymupdf4llm = None
 
-from src.review_workflow.engine.utils import load_model_from_provider
-from src.core.config_loader import get_pdf_metadata_method
-from src.core.providers import get_provider, get_provider_for_purpose, load_all_providers
-from strands import Agent
 from pydantic import BaseModel, Field
+from strands import Agent
+
+from src.core.config_loader import get_pdf_metadata_method
+from src.core.providers import (
+    get_provider_for_purpose,
+    load_all_providers,
+)
+from src.review_workflow.engine.utils import load_model_from_provider
+
 
 class PDFProcessingError(RuntimeError):
     """Error during PDF processing."""
@@ -45,9 +50,16 @@ def derive_collection_name(folder_path: str) -> str:
 
 class PaperMetadata(BaseModel):
     """Structured output model for paper metadata extraction."""
-    title: str = Field(description="Extract the actual title of the research paper from the first page. This should be the main heading or title text, not a placeholder.")
-    abstract: str = Field(description="Extract the abstract text if present on the first page. Look for text under 'Abstract' heading. If not found, use empty string.")
-    authors: list[str] = Field(description="Extract the list of author names from the first page. Look for author names typically listed below the title. If not found, use empty list.")
+
+    title: str = Field(
+        description="Extract the actual title of the research paper from the first page. This should be the main heading or title text, not a placeholder."
+    )
+    abstract: str = Field(
+        description="Extract the abstract text if present on the first page. Look for text under 'Abstract' heading. If not found, use empty string."
+    )
+    authors: list[str] = Field(
+        description="Extract the list of author names from the first page. Look for author names typically listed below the title. If not found, use empty list."
+    )
 
 
 PDF_METADATA_EXTRACTION_METHOD_LLM = "llm"
@@ -59,10 +71,10 @@ def _process_single_page(args: tuple) -> tuple[int, str]:
     Process a single page of a PDF to markdown.
     This function is designed to be called in parallel.
     Imports are done inside to ensure they're available in worker processes.
-    
+
     Args:
         args: Tuple of (pdf_path, page_number)
-        
+
     Returns:
         Tuple of (page_number, markdown_content)
     """
@@ -71,14 +83,14 @@ def _process_single_page(args: tuple) -> tuple[int, str]:
         # Import inside function for multiprocessing compatibility
         import pymupdf
         import pymupdf4llm
-        
+
         doc = pymupdf.open(pdf_path_str)
-        
+
         # Create a temporary single-page document for this page
         # pymupdf4llm.to_markdown works on documents, so we create a new doc with just this page
         temp_doc = pymupdf.open()  # Create empty document
         temp_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
-        
+
         # Convert to markdown
         md = pymupdf4llm.to_markdown(
             temp_doc,
@@ -86,10 +98,10 @@ def _process_single_page(args: tuple) -> tuple[int, str]:
             write_images=False,
             write_tables=True,
         )
-        
+
         temp_doc.close()
         doc.close()
-        
+
         return (page_num, md)
     except Exception as e:
         # Return error info instead of raising to allow other pages to continue
@@ -123,10 +135,10 @@ def pdf_to_markdown(pdf_path: Path, output_path: Path, max_workers: int = 4) -> 
         # Open document to get page count
         with pymupdf.open(str(pdf_path)) as doc:
             num_pages = doc.page_count
-        
+
         if num_pages == 0:
             raise PDFProcessingError("PDF has no pages")
-        
+
         # For small PDFs (1-2 pages), use sequential processing to avoid overhead
         if num_pages <= 2:
             with pymupdf.open(str(pdf_path)) as doc:
@@ -140,32 +152,36 @@ def pdf_to_markdown(pdf_path: Path, output_path: Path, max_workers: int = 4) -> 
             # Process pages in parallel
             pdf_path_str = str(pdf_path)
             page_numbers = list(range(num_pages))
-            
+
             # Use ProcessPoolExecutor for true parallelism (bypasses GIL)
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all pages for processing
                 future_to_page = {
-                    executor.submit(_process_single_page, (pdf_path_str, page_num)): page_num
+                    executor.submit(
+                        _process_single_page, (pdf_path_str, page_num)
+                    ): page_num
                     for page_num in page_numbers
                 }
-                
+
                 # Collect results as they complete
                 page_results = {}
                 for future in as_completed(future_to_page):
                     page_num, md_content = future.result()
                     page_results[page_num] = md_content
-                
+
                 # Combine pages in order with separators
                 md_parts = []
                 for page_num in sorted(page_results.keys()):
                     page_md = page_results[page_num]
                     # Check for errors
                     if page_md.startswith("ERROR_PROCESSING_PAGE:"):
-                        raise PDFProcessingError(f"Error processing page {page_num + 1}: {page_md}")
+                        raise PDFProcessingError(
+                            f"Error processing page {page_num + 1}: {page_md}"
+                        )
                     md_parts.append(page_md)
                     if page_num < num_pages - 1:
                         md_parts.append(f"\n--- end of page={page_num} ---\n")
-                
+
                 md = "".join(md_parts)
 
         # Ensure output directory exists
@@ -179,9 +195,7 @@ def pdf_to_markdown(pdf_path: Path, output_path: Path, max_workers: int = 4) -> 
         raise PDFProcessingError(f"Failed to convert PDF to markdown: {e}") from e
 
 
-def pdf_to_png(
-    pdf_path: Path, output_folder: Path, dpi: int = 200
-) -> list[Path]:
+def pdf_to_png(pdf_path: Path, output_folder: Path, dpi: int = 200) -> list[Path]:
     """
     Convert each page of a PDF to a PNG image.
 
@@ -237,7 +251,9 @@ def extract_first_page(md_content: str) -> str:
     """
     # Split by page separators (--- end of page=N ---)
     # The format is: --- end of page=0 ---, --- end of page=1 ---, etc.
-    pages = re.split(r"^---\s+end\s+of\s+page=\d+\s+---", md_content, flags=re.MULTILINE)
+    pages = re.split(
+        r"^---\s+end\s+of\s+page=\d+\s+---", md_content, flags=re.MULTILINE
+    )
 
     if pages:
         # First element is the first page (content before the first separator)
@@ -261,7 +277,10 @@ def get_pdf_metadata_extraction_method() -> str:
 
 def is_rule_based_pdf_metadata_extraction() -> bool:
     """Return True when PDF metadata should be extracted without an LLM."""
-    return get_pdf_metadata_extraction_method() == PDF_METADATA_EXTRACTION_METHOD_RULE_BASED
+    return (
+        get_pdf_metadata_extraction_method()
+        == PDF_METADATA_EXTRACTION_METHOD_RULE_BASED
+    )
 
 
 def _clean_metadata_line(line: str) -> str:
@@ -314,7 +333,7 @@ def _extract_rule_based_abstract(lines: list[str]) -> str:
     first_line = re.sub(r"(?i)^abstract\b[:.\-\s]*", "", lines[abstract_index]).strip()
     abstract_parts = [first_line] if first_line else []
 
-    for line in lines[abstract_index + 1:]:
+    for line in lines[abstract_index + 1 :]:
         if _is_section_heading(line):
             break
         if re.match(r"(?i)^(doi|http|www\.|copyright|received|accepted)\b", line):
@@ -348,11 +367,17 @@ def _looks_like_affiliation_or_metadata(line: str) -> bool:
 
 def _looks_like_authorish_line(line: str) -> bool:
     if re.search(r"[,;]|\s(and|&)\s", line):
-        parts = [part.strip() for part in re.split(r"[,;]|\s+(?:and|&)\s+", line) if part.strip()]
+        parts = [
+            part.strip()
+            for part in re.split(r"[,;]|\s+(?:and|&)\s+", line)
+            if part.strip()
+        ]
         if len(parts) >= 2:
             authorish_parts = 0
             for part in parts:
-                part_words = [word.strip(".-") for word in part.split() if word.strip(".-")]
+                part_words = [
+                    word.strip(".-") for word in part.split() if word.strip(".-")
+                ]
                 if 1 <= len(part_words) <= 4 and all(
                     re.match(r"^([A-Z]\.?|[A-Z][A-Za-z'\-]+)$", word)
                     for word in part_words
@@ -397,7 +422,9 @@ def _title_score(title: str, first_line_index: int) -> int:
         score -= 8
     if title.isupper():
         score -= 20
-    if re.search(r"(?i)\b(journal|conference|proceedings|workshop|volume|issue)\b", title):
+    if re.search(
+        r"(?i)\b(journal|conference|proceedings|workshop|volume|issue)\b", title
+    ):
         score -= 25
     return score
 
@@ -418,7 +445,9 @@ def _extract_rule_based_title(lines: list[str]) -> tuple[str, Optional[int], int
             next_line = lines[next_index]
             if not _is_title_candidate(next_line):
                 break
-            if _looks_like_affiliation_or_metadata(next_line) or _looks_like_authorish_line(next_line):
+            if _looks_like_affiliation_or_metadata(
+                next_line
+            ) or _looks_like_authorish_line(next_line):
                 break
             title_parts.append(next_line)
             next_index += 1
@@ -443,13 +472,17 @@ def _split_author_candidates(line: str) -> list[str]:
     cleaned = re.sub(r"\b\d+(?:\s*,\s*\d+)*\b", " ", cleaned)
     cleaned = re.sub(r"[*\[\]{}]", " ", cleaned)
     cleaned = re.sub(r"\s+(and|&)\s+", ",", cleaned)
-    return [part.strip(" ,;") for part in re.split(r"[,;]", cleaned) if part.strip(" ,;")]
+    return [
+        part.strip(" ,;") for part in re.split(r"[,;]", cleaned) if part.strip(" ,;")
+    ]
 
 
 def _is_author_name(candidate: str) -> bool:
     if not 3 <= len(candidate) <= 80:
         return False
-    if _looks_like_affiliation_or_metadata(candidate) or re.search(r"\d|@|http", candidate):
+    if _looks_like_affiliation_or_metadata(candidate) or re.search(
+        r"\d|@|http", candidate
+    ):
         return False
     words = [word for word in re.split(r"\s+", candidate) if word]
     if len(words) < 2 or len(words) > 6:
@@ -587,7 +620,10 @@ Remember: Extract the actual title, abstract, and authors that appear in the doc
             "title",
         ]
         title_lower = result["title"].lower()
-        if any(pattern in title_lower for pattern in placeholder_patterns) and len(result["title"]) < 100:
+        if (
+            any(pattern in title_lower for pattern in placeholder_patterns)
+            and len(result["title"]) < 100
+        ):
             # Title looks like a placeholder, try to extract from first page content
             # Look for the first line that looks like a title (usually starts with ## or is the first substantial line)
             # Use ENTIRE first page content, not just first 20 lines
@@ -670,13 +706,17 @@ def get_checklist_extraction_llm_provider() -> Optional[Dict[str, Any]]:
 
 class ChecklistQuestion(BaseModel):
     """Structured output model for a single checklist question."""
+
     id: str = Field(description="Unique identifier for the question (e.g., 'q1', 'q2')")
     text: str = Field(description="The full question text extracted from the checklist")
 
 
 class ChecklistQuestions(BaseModel):
     """Structured output model for checklist questions extraction."""
-    questions: list[ChecklistQuestion] = Field(description="List of all questions extracted from the checklist")
+
+    questions: list[ChecklistQuestion] = Field(
+        description="List of all questions extracted from the checklist"
+    )
 
 
 def extract_checklist_questions_from_pdf(
@@ -685,14 +725,14 @@ def extract_checklist_questions_from_pdf(
 ) -> list[Dict[str, str]]:
     """
     Extract checklist questions from a PDF using pymupdf with layout and LLM.
-    
+
     Args:
         pdf_path: Path to the PDF checklist file
         provider_config: Optional LLM provider config. If None, uses default from settings.
-    
+
     Returns:
         List of dictionaries with 'id' and 'text' keys for each question
-    
+
     Raises:
         PDFProcessingError: If extraction fails
     """
@@ -716,27 +756,27 @@ def extract_checklist_questions_from_pdf(
         # Extract text with layout using pymupdf
         doc = pymupdf.open(str(pdf_path))
         text_content = []
-        
+
         for page_num in range(doc.page_count):
             page = doc[page_num]
             # Use get_text with layout=True to preserve structure
             text = page.get_text("text", sort=True)
             text_content.append(text)
-        
+
         doc.close()
-        
+
         full_text = "\n\n".join(text_content)
-        
+
         if not full_text.strip():
             raise PDFProcessingError("Could not extract any text from the PDF")
-        
+
         # Use LLM to extract questions
         # Use ENTIRE checklist content - no cropping
         system_prompt = """You are an expert at extracting checklist questions from documents.
 Your task is to identify and extract all questions from a checklist document.
 Extract each question as a separate item with a unique ID and the full question text.
 Questions may be numbered, bulleted, or in other formats - extract them all."""
-        
+
         user_prompt = f"""Extract all questions from this checklist document. 
 Return each question with a unique ID (like 'q1', 'q2', etc.) and the full question text.
 
@@ -744,10 +784,10 @@ Document content (ENTIRE checklist):
 {full_text}
 
 Remember: Extract ALL questions from the ENTIRE checklist, including sub-questions if present. Do not skip any questions."""
-        
+
         model = load_model_from_provider(provider_config)
         agent = Agent(model=model, system_prompt=system_prompt)
-        
+
         # Use structured output
         try:
             response = agent(user_prompt, structured_output_model=ChecklistQuestions)
@@ -765,7 +805,7 @@ Remember: Extract ALL questions from the ENTIRE checklist, including sub-questio
                     response_text = response
                 else:
                     response_text = str(response)
-                
+
                 # Try to parse JSON from response
                 json_match = re.search(
                     r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL
@@ -776,32 +816,33 @@ Remember: Extract ALL questions from the ENTIRE checklist, including sub-questio
                     json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
                     if json_match:
                         response_text = json_match.group(0)
-                
+
                 parsed = json.loads(response_text)
                 questions = parsed.get("questions", [])
             else:
                 raise
-        
+
         # Normalize questions format
         normalized_questions = []
         for i, q in enumerate(questions):
             if isinstance(q, dict):
-                question_id = q.get("id", f"q{i+1}")
+                question_id = q.get("id", f"q{i + 1}")
                 question_text = q.get("text", q.get("question", str(q)))
             else:
-                question_id = f"q{i+1}"
+                question_id = f"q{i + 1}"
                 question_text = str(q)
-            
-            normalized_questions.append({
-                "id": question_id,
-                "text": question_text.strip()
-            })
-        
+
+            normalized_questions.append(
+                {"id": question_id, "text": question_text.strip()}
+            )
+
         if not normalized_questions:
-            raise PDFProcessingError("No questions could be extracted from the checklist")
-        
+            raise PDFProcessingError(
+                "No questions could be extracted from the checklist"
+            )
+
         return normalized_questions
-        
+
     except Exception as e:
         if isinstance(e, PDFProcessingError):
             raise
@@ -838,6 +879,7 @@ def process_pdf_to_markdown_and_metadata(
             )
 
     from src.core import storage
+
     md_dir = storage._source_md_dir(collection_dir)
     meta_dir = storage._source_metadata_dir(collection_dir)
     pdf_stem = pdf_path.stem

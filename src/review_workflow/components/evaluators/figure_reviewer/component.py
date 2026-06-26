@@ -1,4 +1,5 @@
 from src.core.criteria import criteria_set_stem
+
 """
 Figure Reviewer: answers a question about figures by loading page images
 and querying a multimodal agent for each page.
@@ -9,11 +10,12 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
-from src.review_workflow.engine.base import BaseComponent
-from src.review_workflow.engine.utils import load_model_from_provider
-from src.review_workflow.engine.token_usage import add as token_usage_add
-from src.core.providers import resolve_provider_config
 from strands import Agent, tool
+
+from src.core.providers import resolve_provider_config
+from src.review_workflow.engine.base import BaseComponent
+from src.review_workflow.engine.token_usage import add as token_usage_add
+from src.review_workflow.engine.utils import load_model_from_provider
 
 
 def slug(name: str) -> str:
@@ -37,7 +39,9 @@ class FigureReviewer(BaseComponent):
     ):
         # Use component id as tool name so process prompts can reference figure_reviewer
         @tool(name="figure_reviewer")
-        def review_figures(question: str, page_numbers: Optional[List[int]] = None) -> str:
+        def review_figures(
+            question: str, page_numbers: Optional[List[int]] = None
+        ) -> str:
             """
             Analyze and answer detailed questions about figures within a paper by examining rendered page images (PNG).
 
@@ -87,7 +91,7 @@ class FigureReviewer(BaseComponent):
         if collections_root is None:
             root = get_project_root()
             collections_root = root / "workspaces" / "guest" / "collections"
-            
+
         checklist_clean = criteria_set_stem(checklist_name)
         return (
             Path(collections_root)
@@ -135,7 +139,11 @@ class FigureReviewer(BaseComponent):
             return Agent(model=model, system_prompt=system_prompt)
 
         pages_dir = self._paper_pages_dir(
-            collection_name, review_process_name, checklist_name, paper_name, collections_root
+            collection_name,
+            review_process_name,
+            checklist_name,
+            paper_name,
+            collections_root,
         )
         if not pages_dir.exists():
             return (
@@ -179,9 +187,9 @@ class FigureReviewer(BaseComponent):
                 parts.append(f"[Page {page_num}]: Image not found ({image_path.name}).")
                 continue
             try:
-                image_bytes_b64 = base64.b64encode(
-                    image_path.read_bytes()
-                ).decode("utf-8")
+                image_bytes_b64 = base64.b64encode(image_path.read_bytes()).decode(
+                    "utf-8"
+                )
             except Exception as e:
                 parts.append(f"[Page {page_num}]: Failed to read image: {e}.")
                 continue

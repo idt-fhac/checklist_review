@@ -1,8 +1,9 @@
-from typing import Dict, Any
-from strands.models.ollama import OllamaModel
-from strands.models.openai import OpenAIModel
+from typing import Any, Dict
+
 from strands.models.gemini import GeminiModel
 from strands.models.litellm import LiteLLMModel
+from strands.models.ollama import OllamaModel
+from strands.models.openai import OpenAIModel
 from strands.types.tools import ToolResult
 
 
@@ -25,7 +26,7 @@ def load_model_from_provider(provider_config: Dict[str, Any]) -> Any:
         client_args: Dict[str, Any] = {
             "api_key": api_key,
         }
-        
+
         if base_url:
             client_args["base_url"] = base_url
 

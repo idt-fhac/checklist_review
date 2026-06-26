@@ -1,0 +1,145 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-06-20 09:31:25,374 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5555
+2026-06-20 09:31:25,374 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-06-20 09:31:30,942 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:30] "GET /health HTTP/1.1" 200 -
+2026-06-20 09:31:30,958 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:30] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e/report HTTP/1.1" 200 -
+2026-06-20 09:31:55,767 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:55] "GET /review/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:31:55,838 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:55] "[36mGET /ui-static/css/review.css HTTP/1.1[0m" 304 -
+2026-06-20 09:31:55,842 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:55] "GET /ui-static/js/review.js HTTP/1.1" 200 -
+2026-06-20 09:31:56,035 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/pipelines HTTP/1.1" 200 -
+2026-06-20 09:31:56,036 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/criteria-sets HTTP/1.1" 200 -
+2026-06-20 09:31:56,086 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:31:56,086 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:31:56,087 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:31:56,087 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:31:56,090 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:31:56,270 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:31:56,322 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:31:56,323 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:31:56,323 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:31:56,323 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:31:56,326 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:31:56,499 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:56] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e/report HTTP/1.1" 200 -
+2026-06-20 09:31:58,450 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /review/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:31:58,626 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /ui-static/css/review.css HTTP/1.1" 200 -
+2026-06-20 09:31:58,632 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /ui-static/js/review.js HTTP/1.1" 200 -
+2026-06-20 09:31:58,829 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /api/v1/pipelines HTTP/1.1" 200 -
+2026-06-20 09:31:58,830 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /api/v1/criteria-sets HTTP/1.1" 200 -
+2026-06-20 09:31:58,875 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:31:58,875 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:31:58,875 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:31:58,875 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:31:58,879 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:58] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:31:59,057 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:59] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:31:59,070 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:59] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-06-20 09:31:59,104 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:31:59,104 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:31:59,104 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:31:59,104 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:31:59,108 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:59] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:31:59,152 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:31:59] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e/report HTTP/1.1" 200 -
+2026-06-20 09:33:03,683 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:03] "GET / HTTP/1.1" 200 -
+2026-06-20 09:33:03,873 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:03] "GET /ui-static/css/review.css HTTP/1.1" 200 -
+2026-06-20 09:33:03,880 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:03] "GET /ui-static/js/review.js HTTP/1.1" 200 -
+2026-06-20 09:33:04,120 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:04] "GET /api/v1/pipelines HTTP/1.1" 200 -
+2026-06-20 09:33:04,121 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:04] "GET /api/v1/criteria-sets HTTP/1.1" 200 -
+2026-06-20 09:33:04,297 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:04,298 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:04,298 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:04,298 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:04,301 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:04] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:33:04,308 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:04] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-06-20 09:33:08,483 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:08,483 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:08,483 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:08,483 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:08,487 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:08] "GET /api/v1/pipelines/scientific_checklist HTTP/1.1" 200 -
+2026-06-20 09:33:09,974 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:09,974 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:09,974 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:09,974 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:09,979 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:09] "GET /api/v1/pipelines/tender_full HTTP/1.1" 200 -
+2026-06-20 09:33:12,472 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:12,472 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:12,472 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:12,472 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:12,475 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:12] "GET /api/v1/pipelines/scientific_checklist HTTP/1.1" 200 -
+2026-06-20 09:33:13,027 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:13,027 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:13,027 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:13,027 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:13,032 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:13] "GET /api/v1/pipelines/tender_full HTTP/1.1" 200 -
+2026-06-20 09:33:13,382 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:13,382 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:13,382 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:13,382 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:13,386 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:13] "GET /api/v1/pipelines/scientific_checklist HTTP/1.1" 200 -
+2026-06-20 09:33:13,556 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:13,557 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:13,557 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:13,557 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:13,560 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:13] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:33:14,063 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:14,064 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:14,064 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:14,064 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:14,067 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:14] "GET /api/v1/pipelines/scientific_checklist HTTP/1.1" 200 -
+2026-06-20 09:33:14,232 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:14,232 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:14,232 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:14,233 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:14,238 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:14] "GET /api/v1/pipelines/tender_full HTTP/1.1" 200 -
+2026-06-20 09:33:18,688 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:18,688 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:18,688 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:18,688 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:18,692 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:18] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:33:24,487 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:33:24,487 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:33:24,487 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:33:24,487 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:33:24,492 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:33:24] "GET /api/v1/pipelines/tender_full HTTP/1.1" 200 -
+2026-06-20 09:34:05,411 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:05] "[35m[1mPOST /api/v1/collections HTTP/1.1[0m" 201 -
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+Warning - arguments ignored in legacy mode: {'write_tables'}.
+2026-06-20 09:34:07,528 - strands.telemetry.metrics - INFO - Creating Strands MetricsClient
+[92m09:34:07 - LiteLLM:INFO[0m: utils.py:3895 - 
+LiteLLM completion() model= gpt-5.2; provider = litellm_proxy
+2026-06-20 09:34:07,548 - LiteLLM - INFO - 
+LiteLLM completion() model= gpt-5.2; provider = litellm_proxy
+2026-06-20 09:34:07,570 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:07] "[31m[1mPOST /api/v1/collections/OpenSpace/documents HTTP/1.1[0m" 422 -
+2026-06-20 09:34:19,542 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET / HTTP/1.1" 200 -
+2026-06-20 09:34:19,627 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET /ui-static/js/review.js HTTP/1.1" 200 -
+2026-06-20 09:34:19,631 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET /ui-static/css/review.css HTTP/1.1" 200 -
+2026-06-20 09:34:19,740 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET /api/v1/pipelines HTTP/1.1" 200 -
+2026-06-20 09:34:19,741 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET /api/v1/criteria-sets HTTP/1.1" 200 -
+2026-06-20 09:34:19,850 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:34:19,850 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:34:19,851 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:34:19,851 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:34:19,854 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:19] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:34:49,558 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:49] "GET /review/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:34:49,633 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:49] "[36mGET /ui-static/css/review.css HTTP/1.1[0m" 304 -
+2026-06-20 09:34:49,639 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:49] "[36mGET /ui-static/js/review.js HTTP/1.1[0m" 304 -
+2026-06-20 09:34:49,836 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:49] "GET /api/v1/pipelines HTTP/1.1" 200 -
+2026-06-20 09:34:49,837 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:49] "GET /api/v1/criteria-sets HTTP/1.1" 200 -
+2026-06-20 09:34:50,015 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:34:50,015 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:34:50,015 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:34:50,015 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:34:50,018 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:50] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:34:50,074 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:50] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e HTTP/1.1" 200 -
+2026-06-20 09:34:50,116 - ToolLoader - INFO - Discovered tool: github_checker
+2026-06-20 09:34:50,116 - ToolLoader - INFO - Discovered tool: search_tool
+2026-06-20 09:34:50,116 - ToolLoader - INFO - Discovered tool: specialist
+2026-06-20 09:34:50,116 - ToolLoader - INFO - Discovered tool: figure_reviewer
+2026-06-20 09:34:50,119 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:50] "GET /api/v1/pipelines/education_rubric HTTP/1.1" 200 -
+2026-06-20 09:34:50,287 - werkzeug - INFO - 127.0.0.1 - - [20/Jun/2026 09:34:50] "GET /api/v1/reviews/bad4a8dc-7ec5-40bc-b2c6-c8267ca4b27e/report HTTP/1.1" 200 -

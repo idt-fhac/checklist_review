@@ -9,7 +9,9 @@ from flask import Blueprint, jsonify, render_template, request, send_from_direct
 from src.core import storage
 from src.core.workspace import get_collections_dir
 
-analysis_bp = Blueprint("analysis", __name__, url_prefix="/analysis", template_folder="templates")
+analysis_bp = Blueprint(
+    "analysis", __name__, url_prefix="/analysis", template_folder="templates"
+)
 
 
 @analysis_bp.route("/static/<path:filename>")
@@ -24,7 +26,8 @@ def index():
     collections_root = get_collections_dir()
     collections_list = storage.list_collections(collections_root)
     collection_options = [
-        {"name": c["name"], "slug": c.get("slug") or c["name"]} for c in collections_list
+        {"name": c["name"], "slug": c.get("slug") or c["name"]}
+        for c in collections_list
     ]
 
     context: Dict[str, Any] = {
@@ -56,9 +59,11 @@ def api_list_criteria_sets():
     base_dir = Path(__file__).resolve().parent.parent.parent.parent
     criteria_sets = storage.list_criteria_sets(base_dir)
     criteria_sets.sort(
-        key=lambda x: x.get("created_at")
-        if isinstance(x.get("created_at"), datetime)
-        else datetime(1970, 1, 1),
+        key=lambda x: (
+            x.get("created_at")
+            if isinstance(x.get("created_at"), datetime)
+            else datetime(1970, 1, 1)
+        ),
         reverse=True,
     )
     return jsonify(criteria_sets)
@@ -97,7 +102,11 @@ def api_get_report():
         if not evaluations:
             continue
 
-        items = evaluations if isinstance(evaluations, list) else evaluations.get("evaluations", [])
+        items = (
+            evaluations
+            if isinstance(evaluations, list)
+            else evaluations.get("evaluations", [])
+        )
         if isinstance(evaluations, dict) and not items:
             items = list(evaluations.values()) if evaluations else []
 
@@ -105,7 +114,11 @@ def api_get_report():
             if not isinstance(entry, dict):
                 continue
             total_criteria += 1
-            label = entry.get("criterion_text") or entry.get("description") or "Unknown criterion"
+            label = (
+                entry.get("criterion_text")
+                or entry.get("description")
+                or "Unknown criterion"
+            )
             val = entry.get("answer")
 
             if label not in criterion_stats:
@@ -146,7 +159,9 @@ def api_get_report():
         for label, s in criterion_stats.items()
     ]
 
-    return jsonify({
-        "automated": automated_stats,
-        "breakdown": breakdown,
-    })
+    return jsonify(
+        {
+            "automated": automated_stats,
+            "breakdown": breakdown,
+        }
+    )

@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import plotly.graph_objects as go
-import requests
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
@@ -19,7 +18,11 @@ def list_available_models() -> List[str]:
     from src.core.providers import get_ollama_models, load_all_providers
 
     ollama_providers = [p for p in load_all_providers() if p["type"] == "ollama"]
-    base_url = ollama_providers[0]["base_url"] if ollama_providers else "http://localhost:11434"
+    base_url = (
+        ollama_providers[0]["base_url"]
+        if ollama_providers
+        else "http://localhost:11434"
+    )
     return get_ollama_models(base_url)
 
 
@@ -51,7 +54,9 @@ def reduce_embeddings(embeddings: np.ndarray) -> np.ndarray:
     return reducer.fit_transform(normalized)
 
 
-def build_plot(records: Sequence[Dict[str, Any]], coordinates: np.ndarray) -> Dict[str, Any]:
+def build_plot(
+    records: Sequence[Dict[str, Any]], coordinates: np.ndarray
+) -> Dict[str, Any]:
     xs = coordinates[:, 0].tolist() if len(coordinates) else [0] * len(records)
     ys = coordinates[:, 1].tolist() if len(coordinates) else [0] * len(records)
     fig = go.Figure(
@@ -60,8 +65,15 @@ def build_plot(records: Sequence[Dict[str, Any]], coordinates: np.ndarray) -> Di
                 x=xs,
                 y=ys,
                 mode="markers",
-                marker=dict(size=12, color="#2563eb", opacity=0.85, line=dict(color="#0f172a", width=1)),
-                text=[record.get("title", record.get("paper_id")) for record in records],
+                marker=dict(
+                    size=12,
+                    color="#2563eb",
+                    opacity=0.85,
+                    line=dict(color="#0f172a", width=1),
+                ),
+                text=[
+                    record.get("title", record.get("paper_id")) for record in records
+                ],
                 customdata=[
                     {
                         "title": record.get("title", record.get("paper_id")),
@@ -89,20 +101,23 @@ def build_plot(records: Sequence[Dict[str, Any]], coordinates: np.ndarray) -> Di
     return fig.to_plotly_json()
 
 
-def visualize_collection(collection_payload: Dict[str, Any], model: str | None = None) -> Dict[str, Any]:
+def visualize_collection(
+    collection_payload: Dict[str, Any], model: str | None = None
+) -> Dict[str, Any]:
     papers = collection_payload.get("papers", [])
     if not papers:
         raise VisualizationError("Collection does not contain any papers.")
 
     # Load abstracts from source/metadata JSON files if not in paper data
-    from pathlib import Path
-    from src.core import storage
     import json
-    
+    from pathlib import Path
+
+    from src.core import storage
+
     collection_name = collection_payload.get("collection_name", "")
     collections_root_str = collection_payload.get("_collections_root", "collections")
     collections_root = Path(collections_root_str)
-    
+
     abstracts = []
     for paper in papers:
         abstract = paper.get("abstract") or paper.get("summary") or ""
@@ -110,10 +125,16 @@ def visualize_collection(collection_payload: Dict[str, Any], model: str | None =
             paper_id = paper.get("paper_id")
             if paper_id:
                 try:
-                    collection_dir = storage._collection_dir(collections_root, collection_name, create=False)
+                    collection_dir = storage._collection_dir(
+                        collections_root, collection_name, create=False
+                    )
                     stem = Path(paper_id).stem
-                    meta_dir = storage._source_metadata_dir(collection_dir, create=False)
-                    json_path = (meta_dir / f"{stem}.json") if meta_dir.exists() else None
+                    meta_dir = storage._source_metadata_dir(
+                        collection_dir, create=False
+                    )
+                    json_path = (
+                        (meta_dir / f"{stem}.json") if meta_dir.exists() else None
+                    )
                     if not json_path or not json_path.exists():
                         json_path = collection_dir / "source_extracted" / f"{stem}.json"
                     if json_path.exists():
@@ -123,14 +144,16 @@ def visualize_collection(collection_payload: Dict[str, Any], model: str | None =
                 except Exception:
                     pass
         abstracts.append(abstract)
-    
+
     if not any(abstracts):
         raise VisualizationError("No abstracts available to visualize.")
 
     from src.core.providers import get_provider_for_purpose
 
     default_embedding = get_provider_for_purpose("embedding")
-    target_model = model or (default_embedding.get("model_name") if default_embedding else None)
+    target_model = model or (
+        default_embedding.get("model_name") if default_embedding else None
+    )
     method = "provider" if default_embedding else "tfidf"
 
     embeddings = embed_texts(abstracts, model=target_model)

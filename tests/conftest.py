@@ -32,12 +32,19 @@ def isolated_workspace(tmp_path, monkeypatch):
     config_dir.mkdir(parents=True)
 
     example_criteria = (
-        Path(__file__).resolve().parent.parent / "config" / "criteria_sets" / "example.yaml"
+        Path(__file__).resolve().parent.parent
+        / "config"
+        / "criteria_sets"
+        / "example.yaml"
     )
     if example_criteria.exists():
-        (criteria_sets / "example.yaml").write_text(example_criteria.read_text(encoding="utf-8"))
+        (criteria_sets / "example.yaml").write_text(
+            example_criteria.read_text(encoding="utf-8")
+        )
 
-    monkeypatch.setattr("src.core.workspace.get_workspaces_root", lambda: workspaces_root)
+    monkeypatch.setattr(
+        "src.core.workspace.get_workspaces_root", lambda: workspaces_root
+    )
 
     def _active_workspace():
         return "guest"

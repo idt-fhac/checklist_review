@@ -7,10 +7,13 @@ from flask import Blueprint, jsonify, request, send_file
 from src.web.api.collection_service import (
     CollectionServiceError,
     create_collection,
+    get_collection_criteria,
+    get_document_content,
     get_references,
     list_artifacts,
     list_collections,
     list_source_documents,
+    save_collection_criteria,
     set_references,
     upload_document,
 )
@@ -103,6 +106,38 @@ def update_collection_references(collection_name: str):
         return jsonify({"error": "urls must be a list of strings"}), 400
     try:
         return jsonify(set_references(collection_name, urls))
+    except CollectionServiceError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
+@api_v1_bp.put("/collections/<collection_name>/criteria")
+def save_collection_criteria_route(collection_name: str):
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(
+            save_collection_criteria(
+                collection_name,
+                data.get("criteria_set_name") or "custom",
+                criteria=data.get("criteria"),
+                text=data.get("text"),
+            )
+        )
+    except CollectionServiceError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
+@api_v1_bp.get("/collections/<collection_name>/criteria/<criteria_set_name>")
+def get_collection_criteria_route(collection_name: str, criteria_set_name: str):
+    try:
+        return jsonify(get_collection_criteria(collection_name, criteria_set_name))
+    except CollectionServiceError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
+@api_v1_bp.get("/collections/<collection_name>/documents/<path:filename>/content")
+def document_content_route(collection_name: str, filename: str):
+    try:
+        return jsonify(get_document_content(collection_name, filename))
     except CollectionServiceError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
 

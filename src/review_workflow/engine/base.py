@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 class BaseComponent:
@@ -10,4 +10,3 @@ class BaseComponent:
             f"{self.__class__.__name__} does not implement execute(); "
             "use the component-specific API (e.g., as_tool/execute_tool) or override execute()."
         )
-

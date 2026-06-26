@@ -59,9 +59,13 @@ def merge_criterion_results(
         merged_answer = any(answers.values())
     else:
         total_weight = sum(weights.get(pid, 1.0) for pid in answers) or 1.0
-        weighted_score = sum(
-            weights.get(pid, 1.0) * (1.0 if answers[pid] else 0.0) for pid in answers
-        ) / total_weight
+        weighted_score = (
+            sum(
+                weights.get(pid, 1.0) * (1.0 if answers[pid] else 0.0)
+                for pid in answers
+            )
+            / total_weight
+        )
         merged_answer = weighted_score >= 0.5
 
     supporting_texts: List[Dict[str, Any]] = []

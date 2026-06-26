@@ -8,18 +8,24 @@ import multiprocessing
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 from src.core import storage, task_persistence
 from src.core.config_loader import list_pipelines, load_pipeline
-from src.core.criteria import find_criteria_set_path, load_criteria_set_file
+from src.core.criteria import load_criteria_set_file
+from src.core.criteria_overview import build_criteria_overview
+from src.core.criteria_resolver import resolve_criteria_path
 from src.core.task_manager import TaskManager, TaskStatus
 from src.core.workspace import get_collections_dir, get_criteria_sets_dir
-from src.review_workflow.engine.pipeline_loader import build_review_process_definition, load_pipeline_flow
-from src.review_workflow.engine.run_paths import artifact_run_dir
 from src.review_workflow.components.evaluators.criterion_evaluator.file_utils import (
     get_persona_evaluations_dir,
     get_persona_manifest_path,
 )
+from src.review_workflow.engine.pipeline_loader import (
+    build_review_process_definition,
+    load_pipeline_flow,
+)
+from src.review_workflow.engine.run_paths import artifact_run_dir
 from src.review_workflow.review_runner import run_review_subprocess
 
 logger = logging.getLogger(__name__)
@@ -46,7 +52,11 @@ def get_pipeline_manifest(pipeline_id: str) -> Dict[str, Any]:
         "id": pipeline.get("id") or pipeline_id,
         "name": pipeline.get("name") or pipeline_id,
         "profile": pipeline.get("profile"),
-        "stages": [next(iter(step.keys())) for step in (pipeline.get("stages") or []) if isinstance(step, dict)],
+        "stages": [
+            next(iter(step.keys()))
+            for step in (pipeline.get("stages") or [])
+            if isinstance(step, dict)
+        ],
         "flow": load_pipeline_flow(pipeline_id),
         "evaluation_mode": evaluation.get("mode", "single"),
         "personas": evaluation.get("personas") or [],
@@ -75,7 +85,9 @@ def _sync_running_tasks(collections_root: Path, collection_name: str) -> None:
         task.progress.total = file_progress.get("total", task.progress.total)
         task.progress.current_item = file_progress.get("current_item", "")
         status_val = file_progress.get("status", "running")
-        task.progress.status = TaskStatus(status_val) if isinstance(status_val, str) else status_val
+        task.progress.status = (
+            TaskStatus(status_val) if isinstance(status_val, str) else status_val
+        )
         task.progress.error = file_progress.get("error")
         if task.progress.status == TaskStatus.RUNNING:
             task.progress.status = TaskStatus.FAILED
@@ -100,7 +112,8 @@ def start_review(
         raise ReviewServiceError("pipeline_id is required")
     pipeline = load_pipeline(pipeline_id)
     has_extractor = any(
-        isinstance(step, dict) and "criteria_extractor" in step for step in (pipeline.get("stages") or [])
+        isinstance(step, dict) and "criteria_extractor" in step
+        for step in (pipeline.get("stages") or [])
     )
     if not criteria_set_name:
         if has_extractor:
@@ -126,8 +139,15 @@ def start_review(
             409,
         )
 
-    criteria_path = find_criteria_set_path(get_criteria_sets_dir(), criteria_set_name)
+    criteria_path = resolve_criteria_path(
+        collections_root,
+        collection_name,
+        criteria_set_name,
+        get_criteria_sets_dir(),
+    )
     if criteria_path is None and not has_extractor:
+        raise ReviewServiceError(f"Criteria set '{criteria_set_name}' not found", 404)
+    if criteria_path is None and has_extractor and criteria_set_name != "extracted":
         raise ReviewServiceError(f"Criteria set '{criteria_set_name}' not found", 404)
 
     selected_artifacts = storage.list_selected_files(collections_root, collection_name)
@@ -136,20 +156,28 @@ def start_review(
         selected_artifacts = [
             artifact
             for artifact in selected_artifacts
-            if artifact.get("artifact_id") in wanted or artifact.get("filename") in wanted
+            if artifact.get("artifact_id") in wanted
+            or artifact.get("filename") in wanted
         ]
 
     if skip_existing:
-        existing = storage.list_evaluations(collections_root, collection_name, pipeline_id, criteria_set_name)
+        existing = storage.list_evaluations(
+            collections_root, collection_name, pipeline_id, criteria_set_name
+        )
         processed = {item.get("filename") for item in existing if item.get("filename")}
         selected_artifacts = [
-            artifact for artifact in selected_artifacts if artifact.get("filename") not in processed
+            artifact
+            for artifact in selected_artifacts
+            if artifact.get("filename") not in processed
         ]
 
     if not selected_artifacts:
         total = storage.list_selected_files(collections_root, collection_name)
         if not total:
-            raise ReviewServiceError("No artifacts found in collection. Upload a draft with role=artifact.", 400)
+            raise ReviewServiceError(
+                "No artifacts found in collection. Upload a draft with role=artifact.",
+                400,
+            )
         raise ReviewServiceError("No artifacts left to review", 400)
 
     if reference_urls is None:
@@ -182,7 +210,9 @@ def start_review(
             "current_item": task.progress.current_item,
             "status": task.progress.status.value,
             "error": task.progress.error,
-            "started_at": task.progress.started_at.isoformat() if task.progress.started_at else None,
+            "started_at": task.progress.started_at.isoformat()
+            if task.progress.started_at
+            else None,
             "completed_at": None,
             "results": [],
             "log_messages": [],
@@ -215,7 +245,9 @@ def _load_task(review_id: str):
         if task.progress.status == TaskStatus.RUNNING:
             file_progress = task_persistence.read_progress(collections_root, review_id)
             if file_progress:
-                task.progress = task_persistence.TaskView(review_id, file_progress).progress
+                task.progress = task_persistence.TaskView(
+                    review_id, file_progress
+                ).progress
 
     if not task and not payload:
         return None, None, collections_root
@@ -231,7 +263,9 @@ def get_review_status(review_id: str) -> Dict[str, Any]:
     progress = task.progress
     return {
         "review_id": review_id,
-        "status": progress.status.value if hasattr(progress.status, "value") else progress.status,
+        "status": progress.status.value
+        if hasattr(progress.status, "value")
+        else progress.status,
         "collection_name": payload.get("collection_name"),
         "pipeline_id": payload.get("pipeline_id"),
         "criteria_set_name": payload.get("criteria_set_name"),
@@ -263,7 +297,10 @@ def cancel_review(review_id: str) -> Dict[str, Any]:
     if hasattr(task, "stop_event") and task.stop_event is not None:
         task.stop_event.set()
     task_persistence.request_stop(collections_root, review_id)
-    if getattr(task, "stop_event", None) is not None and task.progress.status == TaskStatus.PENDING:
+    if (
+        getattr(task, "stop_event", None) is not None
+        and task.progress.status == TaskStatus.PENDING
+    ):
         task.progress.status = TaskStatus.STOPPED
         task.progress.completed_at = datetime.now()
 
@@ -307,7 +344,11 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
         )
         if evaluations is None and artifact_id and artifact_id != filename:
             evaluations = storage.load_evaluation(
-                collections_root, collection_name, artifact_id, pipeline_id, criteria_set_name
+                collections_root,
+                collection_name,
+                artifact_id,
+                pipeline_id,
+                criteria_set_name,
             )
         if isinstance(evaluations, list):
             evaluation_items = evaluations
@@ -324,7 +365,11 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
             criteria_set_name,
         )
         outputs = storage.list_review_outputs(
-            collections_root, collection_name, pipeline_id, criteria_set_name, artifact_id
+            collections_root,
+            collection_name,
+            pipeline_id,
+            criteria_set_name,
+            artifact_id,
         )
         output_entries = [
             {
@@ -364,13 +409,18 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
             for persona_file in sorted(persona_dir.glob("*.json")):
                 if persona_file.name == "manifest.json":
                     continue
-                persona_evaluations[persona_file.stem] = _read_json_if_exists(persona_file)
+                persona_evaluations[persona_file.stem] = _read_json_if_exists(
+                    persona_file
+                )
+
+        overview = build_criteria_overview(criteria_doc, evaluation_items)
 
         artifact_reports.append(
             {
                 "artifact_id": artifact_id,
                 "filename": filename,
                 "evaluations": evaluation_items,
+                "overview": overview,
                 "persona_manifest": persona_manifest,
                 "persona_evaluations": persona_evaluations or None,
                 "criteria": criteria_doc,
@@ -382,8 +432,34 @@ def build_review_report(review_id: str) -> Dict[str, Any]:
             }
         )
 
+    input_documents: List[Dict[str, Any]] = []
+    collection_name = payload.get("collection_name") or ""
+    if payload.get("criteria_source_name"):
+        rfp_name = payload["criteria_source_name"]
+        input_documents.append(
+            {
+                "filename": rfp_name,
+                "role": "rfp",
+                "label": "Requirements / RFP",
+                "view_url": f"/api/v1/collections/{collection_name}/documents/{quote(rfp_name, safe='')}/content",
+            }
+        )
+    for artifact in payload.get("artifacts", []):
+        filename = artifact.get("filename")
+        if not filename:
+            continue
+        input_documents.append(
+            {
+                "filename": filename,
+                "role": "draft",
+                "label": "Draft",
+                "view_url": f"/api/v1/collections/{collection_name}/documents/{quote(filename, safe='')}/content",
+            }
+        )
+
     return {
         **status,
+        "input_documents": input_documents,
         "artifacts": artifact_reports,
     }
 

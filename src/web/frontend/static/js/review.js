@@ -8,10 +8,13 @@ const state = {
   pipelineDetail: null,
   collectionName: "",
   criteriaSetName: "",
+  criteriaMode: "preset",
   rfpFilename: "",
   draftArtifactId: "",
   reviewId: "",
   pollTimer: null,
+  reportArtifact: null,
+  activePersonaId: "",
 };
 
 function $(id) {
@@ -65,11 +68,18 @@ function pipelineLabel() {
 }
 
 function criteriaLabel() {
-  const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
-  if (hasExtractor) {
-    return state.rfpFilename ? `From RFP: ${state.rfpFilename}` : "Extracted from RFP";
+  const mode = state.criteriaMode || $("criteriaMode")?.value || "preset";
+  if (mode === "extract") {
+    return state.rfpFilename ? `From RFP: ${state.rfpFilename}` : "Extract from RFP";
+  }
+  if (mode === "custom") {
+    return "Custom criteria";
   }
   return $("criteriaSetSelect")?.value || state.criteriaSetName || "—";
+}
+
+function artifactIdFromFilename(filename) {
+  return filename.replace(/\.[^.]+$/, "");
 }
 
 function updateSelectionSummary() {
@@ -227,13 +237,19 @@ async function openReviewFromUrl(reviewId) {
   state.criteriaSetName = status.criteria_set_name || state.criteriaSetName;
   if (status.criteria_source_name) {
     state.rfpFilename = status.criteria_source_name;
+    state.criteriaMode = "extract";
+  } else if (status.criteria_set_name === "custom") {
+    state.criteriaMode = "custom";
+  } else {
+    state.criteriaMode = "preset";
   }
   if (state.criteriaSetName && $("criteriaSetSelect")) {
     $("criteriaSetSelect").value = state.criteriaSetName;
   }
+  updateCriteriaModeUI();
   const firstResult = (status.results || [])[0];
   if (firstResult?.filename) {
-    state.draftArtifactId = firstResult.artifact_id || firstResult.filename.replace(/\.pdf$/i, "");
+    state.draftArtifactId = firstResult.artifact_id || artifactIdFromFilename(firstResult.filename);
     $("draftStatus").textContent = `Uploaded: ${firstResult.filename}`;
   }
   updateSelectionSummary();
@@ -273,12 +289,42 @@ function pipelineHasExtractor(detail) {
   return (detail?.stages || []).includes("criteria_extractor");
 }
 
-function updateCriteriaVisibility() {
+function updateCriteriaModeUI() {
   const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
-  $("criteriaSetField").style.display = hasExtractor ? "none" : "block";
-  $("criteriaSetHint").textContent = hasExtractor
-    ? "Criteria will be extracted from the RFP automatically."
-    : "Select a criteria set from the workspace.";
+  const modeSelect = $("criteriaMode");
+  const presetSelect = $("criteriaSetSelect");
+  const customArea = $("customCriteria");
+  const hint = $("criteriaModeHint");
+  if (!modeSelect || !presetSelect || !customArea) {
+    return;
+  }
+
+  const extractOption = modeSelect.querySelector('option[value="extract"]');
+  if (extractOption) {
+    extractOption.hidden = !hasExtractor;
+  }
+
+  if (hasExtractor && !["extract", "custom", "preset"].includes(state.criteriaMode)) {
+    state.criteriaMode = "extract";
+  } else if (!hasExtractor && state.criteriaMode === "extract") {
+    state.criteriaMode = "preset";
+  }
+  modeSelect.value = state.criteriaMode;
+
+  const mode = modeSelect.value;
+  presetSelect.hidden = mode !== "preset";
+  customArea.hidden = mode !== "custom";
+
+  if (hint) {
+    if (mode === "extract") {
+      hint.textContent = "Criteria will be extracted from the uploaded RFP automatically.";
+    } else if (mode === "custom") {
+      hint.textContent = "Enter one criterion per line, or paste YAML with a criteria list.";
+    } else {
+      hint.textContent = "Select a saved criteria set from the workspace.";
+    }
+  }
+  updateSelectionSummary();
 }
 
 async function loadPipelines() {
@@ -321,8 +367,12 @@ async function onPipelineChange() {
     hint.push(`Personas: ${personas.map((p) => p.label || p.id).join(", ")}`);
   }
   $("pipelineHint").textContent = hint.join(" · ");
-  updateCriteriaVisibility();
-  updateSelectionSummary();
+  if (pipelineHasExtractor(state.pipelineDetail)) {
+    state.criteriaMode = "extract";
+  } else if (state.criteriaMode === "extract") {
+    state.criteriaMode = "preset";
+  }
+  updateCriteriaModeUI();
 }
 
 async function ensureCollection() {
@@ -367,20 +417,41 @@ async function saveReferences() {
   });
 }
 
+async function saveCustomCriteria() {
+  const text = $("customCriteria")?.value.trim();
+  if (!text) {
+    throw new Error("Enter custom criteria.");
+  }
+  await fetchJSON(`${API}/collections/${encodeURIComponent(state.collectionName)}/criteria`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ criteria_set_name: "custom", text }),
+  });
+  state.criteriaSetName = "custom";
+}
+
 async function handleUploadAndStart() {
   const btn = $("btnRunReview");
   setButtonLoading(btn, true, "Uploading…");
   try {
     await ensureCollection();
+    const mode = $("criteriaMode")?.value || state.criteriaMode;
+    state.criteriaMode = mode;
     const hasExtractor = pipelineHasExtractor(state.pipelineDetail);
     const rfpInput = $("rfpFile");
     const draftInput = $("draftFile");
 
-    if (hasExtractor && !rfpInput.files.length) {
-      throw new Error("Upload the RFP / requirements PDF for this pipeline.");
+    if (mode === "extract" && !rfpInput.files.length) {
+      throw new Error("Upload the RFP / requirements document for this pipeline.");
+    }
+    if (mode === "preset" && !$("criteriaSetSelect")?.value) {
+      throw new Error("Select a criteria set.");
+    }
+    if (mode === "custom" && !$("customCriteria")?.value.trim()) {
+      throw new Error("Enter custom criteria.");
     }
     if (!draftInput.files.length) {
-      throw new Error("Upload the draft PDF to evaluate.");
+      throw new Error("Upload the draft document to evaluate.");
     }
 
     if (rfpInput.files.length) {
@@ -391,12 +462,20 @@ async function handleUploadAndStart() {
     }
 
     const draftResult = await uploadDocument(draftInput.files[0], "artifact");
-    state.draftArtifactId = draftResult.artifact_id || draftResult.filename.replace(/\.pdf$/i, "");
+    state.draftArtifactId = draftResult.artifact_id || artifactIdFromFilename(draftResult.filename);
     $("draftCard").classList.add("uploaded");
     $("draftStatus").textContent = `Uploaded: ${draftResult.filename}`;
 
+    if (mode === "custom") {
+      setButtonLoading(btn, true, "Saving criteria…");
+      await saveCustomCriteria();
+    } else if (mode === "preset") {
+      state.criteriaSetName = $("criteriaSetSelect").value;
+    } else if (hasExtractor) {
+      state.criteriaSetName = "extracted";
+    }
+
     await saveReferences();
-    state.criteriaSetName = $("criteriaSetSelect")?.value || state.criteriaSetName;
     updateSelectionSummary();
 
     setStep(3);
@@ -459,14 +538,19 @@ async function pollReview() {
 }
 
 async function startReview() {
+  const mode = $("criteriaMode")?.value || state.criteriaMode;
   const body = {
     collection_name: state.collectionName,
     pipeline_id: state.pipelineId,
     artifact_ids: state.draftArtifactId ? [state.draftArtifactId] : undefined,
     skip_existing: false,
   };
-  if (pipelineHasExtractor(state.pipelineDetail)) {
+
+  if (mode === "extract") {
     body.criteria_source_name = state.rfpFilename;
+    body.criteria_set_name = "extracted";
+  } else if (mode === "custom") {
+    body.criteria_set_name = "custom";
   } else {
     body.criteria_set_name = $("criteriaSetSelect").value || state.criteriaSetName;
   }
@@ -528,15 +612,348 @@ function buildEvaluationSummary(evaluations) {
   return `${parts.join(" · ")}. See per-criterion results below.`;
 }
 
+function sanitizeHtml(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, iframe, object, embed, form, style").forEach((el) => el.remove());
+  doc.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      if (attr.name.startsWith("on") || attr.name === "srcdoc") {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return doc.body.innerHTML;
+}
+
+function toggleCollapsibleSection(section) {
+  if (!section) {
+    return;
+  }
+  const button = section.querySelector(".collapsible-header");
+  const body = section.querySelector(".collapsible-body");
+  if (!button || !body) {
+    return;
+  }
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  button.setAttribute("aria-expanded", expanded ? "false" : "true");
+  section.classList.toggle("collapsed", expanded);
+}
+
+function bindCollapsibleSections() {
+  document.querySelectorAll(".collapsible-header").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleCollapsibleSection(button.closest(".collapsible-section"));
+    });
+  });
+}
+
+function renderReportSummary(text, { markdown = false } = {}) {
+  const el = $("reportSummary");
+  if (!el) {
+    return;
+  }
+  if (!text) {
+    el.textContent = "No synthesis available.";
+    el.classList.remove("markdown-body");
+    return;
+  }
+  if (markdown && typeof marked !== "undefined") {
+    el.innerHTML = sanitizeHtml(
+      marked.parse(text, { breaks: true, gfm: true }),
+    );
+    el.classList.add("markdown-body");
+    return;
+  }
+  el.textContent = text;
+  el.classList.remove("markdown-body");
+}
+
+function renderOverviewStats(summary) {
+  const container = $("overviewStats");
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  if (!summary) {
+    return;
+  }
+
+  const cards = [
+    {
+      label: "Criteria",
+      value: summary.total ?? 0,
+      detail: `${summary.met ?? 0} met · ${summary.not_met ?? 0} not met`,
+    },
+  ];
+
+  if (summary.weighted_score_percent != null) {
+    cards.push({
+      label: "Weighted score",
+      value: `${summary.weighted_score_percent}%`,
+      detail: `${summary.weighted_earned ?? 0} / ${summary.weighted_total ?? 0} points earned`,
+    });
+  }
+
+  if (summary.disagreements) {
+    cards.push({
+      label: "Disagreements",
+      value: summary.disagreements,
+      detail: "Personas diverged on one or more criteria",
+    });
+  }
+
+  for (const card of cards) {
+    const el = document.createElement("div");
+    el.className = "stat-card";
+    el.innerHTML = `
+      <span class="stat-label">${card.label}</span>
+      <span class="stat-value">${card.value}</span>
+      <span class="stat-detail">${card.detail}</span>
+    `;
+    container.appendChild(el);
+  }
+}
+
+function renderOverviewTable(rows) {
+  const tbody = $("overviewBody");
+  const section = $("reportOverview");
+  if (!tbody || !section) {
+    return;
+  }
+  tbody.innerHTML = "";
+  if (!rows?.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+
+    const criterionCell = document.createElement("td");
+    criterionCell.textContent = row.description || row.criterion_id || "Criterion";
+
+    const weightCell = document.createElement("td");
+    weightCell.textContent = row.weight_label || "—";
+
+    const resultCell = document.createElement("td");
+    resultCell.appendChild(answerBadge(row.answer));
+    if (row.disagreement) {
+      const warn = document.createElement("div");
+      warn.className = "persona-row";
+      warn.textContent = "Personas disagreed";
+      resultCell.appendChild(warn);
+    }
+
+    const refCell = document.createElement("td");
+    refCell.textContent = row.source_ref || "—";
+
+    tr.appendChild(criterionCell);
+    tr.appendChild(weightCell);
+    tr.appendChild(resultCell);
+    tr.appendChild(refCell);
+    tbody.appendChild(tr);
+  }
+}
+
+function buildOverviewLookup(overview) {
+  const lookup = new Map();
+  for (const row of overview?.rows || []) {
+    if (row.criterion_id) {
+      lookup.set(row.criterion_id, row);
+    }
+  }
+  return lookup;
+}
+
+function renderEvidenceList(supportingTexts) {
+  const list = document.createElement("div");
+  list.className = "evidence-list";
+  const items = (supportingTexts || []).slice(0, 4);
+  if (!items.length) {
+    list.textContent = "—";
+    return list;
+  }
+  for (const item of items) {
+    const block = document.createElement("div");
+    block.className = "evidence-item";
+    const meta = document.createElement("div");
+    meta.className = "evidence-meta";
+    const page = item.page_number >= 0 ? `Page ${item.page_number}` : "Analysis";
+    meta.textContent = page;
+    const text = document.createElement("div");
+    text.className = "evidence-text";
+    text.textContent = item.short_explanation || item.text_crop || "";
+    block.appendChild(meta);
+    block.appendChild(text);
+    list.appendChild(block);
+  }
+  return list;
+}
+
+function getPersonaReviewViews(artifact) {
+  const views = [];
+  const manifestPersonas = artifact?.persona_manifest?.personas || [];
+  const personaEvaluations = artifact?.persona_evaluations || {};
+
+  if (manifestPersonas.length && personaEvaluations) {
+    for (const persona of manifestPersonas) {
+      const evaluations = personaEvaluations[persona.id];
+      if (Array.isArray(evaluations) && evaluations.length) {
+        views.push({
+          id: persona.id,
+          label: persona.label || persona.id,
+          evaluations,
+        });
+      }
+    }
+    return views;
+  }
+
+  if (artifact?.evaluations?.length) {
+    views.push({
+      id: "merged",
+      label: "Reviewer",
+      evaluations: artifact.evaluations,
+    });
+  }
+  return views;
+}
+
+function renderPersonaReviewTable(view, overviewLookup) {
+  const tbody = $("personaReviewBody");
+  if (!tbody || !view) {
+    return;
+  }
+  tbody.innerHTML = "";
+
+  for (const item of view.evaluations) {
+    const tr = document.createElement("tr");
+    const overviewRow = overviewLookup.get(item.criterion_id) || {};
+
+    const criterionCell = document.createElement("td");
+    criterionCell.textContent =
+      item.criterion_text || overviewRow.description || item.criterion_id || "Criterion";
+
+    const weightCell = document.createElement("td");
+    weightCell.textContent = overviewRow.weight_label || "—";
+
+    const resultCell = document.createElement("td");
+    resultCell.appendChild(answerBadge(item.answer));
+
+    const evidenceCell = document.createElement("td");
+    evidenceCell.appendChild(renderEvidenceList(item.supporting_texts));
+
+    tr.appendChild(criterionCell);
+    tr.appendChild(weightCell);
+    tr.appendChild(resultCell);
+    tr.appendChild(evidenceCell);
+    tbody.appendChild(tr);
+  }
+}
+
+function renderPersonaReviews(artifact) {
+  const section = $("personaReviews");
+  const tabs = $("personaTabs");
+  if (!section || !tabs) {
+    return;
+  }
+
+  const views = getPersonaReviewViews(artifact);
+  tabs.innerHTML = "";
+  if (!views.length) {
+    section.hidden = true;
+    state.activePersonaId = "";
+    return;
+  }
+
+  section.hidden = false;
+  if (!views.some((view) => view.id === state.activePersonaId)) {
+    state.activePersonaId = views[0].id;
+  }
+
+  for (const view of views) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "persona-tab";
+    button.dataset.personaId = view.id;
+    button.textContent = view.label;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", view.id === state.activePersonaId ? "true" : "false");
+    if (view.id === state.activePersonaId) {
+      button.classList.add("active");
+    }
+    button.addEventListener("click", () => {
+      state.activePersonaId = view.id;
+      renderPersonaReviews(state.reportArtifact);
+    });
+    tabs.appendChild(button);
+  }
+
+  const activeView = views.find((view) => view.id === state.activePersonaId) || views[0];
+  renderPersonaReviewTable(activeView, buildOverviewLookup(artifact?.overview));
+}
+
+async function openDocumentViewer(viewUrl, label) {
+  const data = await fetchJSON(viewUrl);
+  $("documentViewerTitle").textContent = `${label || "Document"}: ${data.filename}`;
+  $("documentViewerContent").textContent = data.content || "";
+  const viewer = $("documentViewer");
+  if (viewer) {
+    viewer.hidden = false;
+    viewer.removeAttribute("hidden");
+  }
+}
+
+function closeDocumentViewer() {
+  const viewer = $("documentViewer");
+  if (!viewer) {
+    return;
+  }
+  viewer.hidden = true;
+  viewer.setAttribute("hidden", "");
+  $("documentViewerContent").textContent = "";
+}
+
+function renderInputDocuments(report) {
+  const section = $("reportInputDocuments");
+  const container = $("inputDocumentLinks");
+  if (!section || !container) {
+    return;
+  }
+  container.innerHTML = "";
+  const docs = report.input_documents || [];
+  if (!docs.length) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  for (const doc of docs) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "doc-link";
+    button.textContent = `${doc.label || doc.role}: ${doc.filename}`;
+    button.addEventListener("click", () => {
+      openDocumentViewer(doc.view_url, doc.label || doc.role).catch(showError);
+    });
+    container.appendChild(button);
+  }
+}
+
 async function loadReport() {
   const report = await fetchJSON(`${API}/reviews/${state.reviewId}/report`);
   $("reportMeta").textContent =
     `Review ${report.review_id} · ${report.pipeline_id} · ${report.status}`;
   updateShareLink();
+  renderInputDocuments(report);
 
   const artifact = (report.artifacts || [])[0];
+  state.reportArtifact = artifact;
+  renderOverviewStats(artifact?.overview?.summary);
+  renderOverviewTable(artifact?.overview?.rows);
+
   const synthesis = artifact?.synthesis?.summary || buildEvaluationSummary(artifact?.evaluations);
-  $("reportSummary").textContent = synthesis || "No synthesis available.";
+  renderReportSummary(synthesis, { markdown: Boolean(artifact?.synthesis?.summary) });
 
   const downloads = $("reportDownloads");
   downloads.innerHTML = "";
@@ -552,38 +969,7 @@ async function loadReport() {
     downloads.appendChild(link);
   }
 
-  const tbody = $("reportBody");
-  tbody.innerHTML = "";
-  for (const item of artifact?.evaluations || []) {
-    const tr = document.createElement("tr");
-
-    const criterionCell = document.createElement("td");
-    criterionCell.textContent = item.criterion_text || item.criterion_id || "Criterion";
-
-    const resultCell = document.createElement("td");
-    resultCell.appendChild(answerBadge(item.answer));
-    if (item.disagreement) {
-      const warn = document.createElement("div");
-      warn.className = "persona-row";
-      warn.textContent = "Personas disagreed";
-      resultCell.appendChild(warn);
-    }
-
-    const notesCell = document.createElement("td");
-    notesCell.textContent = item.reasoning || "";
-    const personaScores = item.persona_scores || {};
-    for (const [personaId, score] of Object.entries(personaScores)) {
-      const row = document.createElement("div");
-      row.className = "persona-row";
-      row.textContent = `${score.label || personaId}: ${score.answer ? "MET" : "NOT MET"}`;
-      notesCell.appendChild(row);
-    }
-
-    tr.appendChild(criterionCell);
-    tr.appendChild(resultCell);
-    tr.appendChild(notesCell);
-    tbody.appendChild(tr);
-  }
+  renderPersonaReviews(artifact);
 }
 
 function resetApp() {
@@ -592,8 +978,15 @@ function resetApp() {
     state.pollTimer = null;
   }
   state.reviewId = "";
+  state.reportArtifact = null;
+  state.activePersonaId = "";
   state.rfpFilename = "";
   state.draftArtifactId = "";
+  state.criteriaMode = pipelineHasExtractor(state.pipelineDetail) ? "extract" : "preset";
+  if ($("customCriteria")) {
+    $("customCriteria").value = "";
+  }
+  updateCriteriaModeUI();
   $("rfpFile").value = "";
   $("draftFile").value = "";
   $("referenceUrls").value = "";
@@ -610,21 +1003,22 @@ function resetApp() {
 
 function bindEvents() {
   $("pipelineSelect")?.addEventListener("change", () => onPipelineChange().catch(showError));
+  $("criteriaMode")?.addEventListener("change", () => {
+    state.criteriaMode = $("criteriaMode").value;
+    updateCriteriaModeUI();
+  });
   $("criteriaSetSelect")?.addEventListener("change", () => {
     state.criteriaSetName = $("criteriaSetSelect").value;
     updateSelectionSummary();
   });
+  $("customCriteria")?.addEventListener("input", () => updateSelectionSummary());
   $("collectionName")?.addEventListener("input", () => updateSelectionSummary());
   $("btnToUpload")?.addEventListener("click", async () => {
     try {
       if (!$("collectionName").value.trim()) {
         throw new Error("Enter a project name.");
       }
-      if (!pipelineHasExtractor(state.pipelineDetail) && !$("criteriaSetSelect").value) {
-        throw new Error("Select a criteria set.");
-      }
       state.collectionName = $("collectionName").value.trim();
-      state.criteriaSetName = $("criteriaSetSelect").value || state.criteriaSetName;
       updateSelectionSummary();
       setStep(2);
     } catch (err) {
@@ -632,10 +1026,28 @@ function bindEvents() {
     }
   });
   $("btnBackSetup")?.addEventListener("click", () => setStep(1));
+  $("btnBackToSetup")?.addEventListener("click", () => setStep(1));
   $("btnRunReview")?.addEventListener("click", () => handleUploadAndStart().catch(showError));
   $("btnCancelReview")?.addEventListener("click", () => cancelReview().catch(showError));
   $("btnCopyReviewLink")?.addEventListener("click", () => copyReviewLink().catch(showError));
   $("btnNewReview")?.addEventListener("click", resetApp);
+  $("btnCloseDocumentViewer")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeDocumentViewer();
+  });
+  $("documentViewer")?.querySelector(".document-viewer-panel")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+  $("documentViewer")?.addEventListener("click", (event) => {
+    if (event.target === $("documentViewer")) {
+      closeDocumentViewer();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && $("documentViewer") && !$("documentViewer").hidden) {
+      closeDocumentViewer();
+    }
+  });
   window.addEventListener("popstate", () => {
     const reviewId = getReviewIdFromUrl();
     if (reviewId) {
@@ -650,8 +1062,10 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  bindCollapsibleSections();
   try {
     await Promise.all([loadPipelines(), loadCriteriaSets()]);
+    updateCriteriaModeUI();
     const reviewId = getReviewIdFromUrl();
     if (reviewId) {
       await openReviewFromUrl(reviewId);

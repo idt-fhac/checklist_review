@@ -1,14 +1,15 @@
-import subprocess
 import re
+import subprocess
 from pathlib import Path
 from typing import List, Optional
-from src.core.criteria import criteria_set_stem
 
-from src.review_workflow.engine.base import BaseComponent
-from src.review_workflow.engine.utils import load_model_from_provider
-from src.review_workflow.engine.token_usage import add as token_usage_add
-from src.core.providers import resolve_provider_config
 from strands import Agent, tool
+
+from src.core.criteria import criteria_set_stem
+from src.core.providers import resolve_provider_config
+from src.review_workflow.engine.base import BaseComponent
+from src.review_workflow.engine.token_usage import add as token_usage_add
+from src.review_workflow.engine.utils import load_model_from_provider
 
 
 def slug(name: str) -> str:
@@ -95,7 +96,7 @@ class GithubChecker(BaseComponent):
             else:
                 project_root = get_project_root()
                 base_dir = project_root / "workspaces" / "guest" / "collections"
-                
+
             checklist_name_clean = criteria_set_stem(checklist_name)
             return (
                 base_dir
@@ -164,7 +165,9 @@ class GithubChecker(BaseComponent):
             return response.text if hasattr(response, "text") else str(response)
 
         if log_callback:
-            log_callback(f"Using GithubChecker tool for repository: {github_url}", "info")
+            log_callback(
+                f"Using GithubChecker tool for repository: {github_url}", "info"
+            )
 
         repo_path = get_repo_path()
         repo_name = github_url.rstrip("/").split("/")[-1]

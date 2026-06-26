@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
 import threading
 import uuid
-import logging
-from datetime import datetime
-from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     import multiprocessing
@@ -95,9 +95,13 @@ class TaskManager:
 
     def get_tasks_for_collection(self, collection_name: str) -> List[BackgroundTask]:
         with self._tasks_lock:
-            return [t for t in self._tasks.values() if t.collection_name == collection_name]
+            return [
+                t for t in self._tasks.values() if t.collection_name == collection_name
+            ]
 
-    def get_running_task_for_collection(self, collection_name: str) -> Optional[BackgroundTask]:
+    def get_running_task_for_collection(
+        self, collection_name: str
+    ) -> Optional[BackgroundTask]:
         for task in self.get_tasks_for_collection(collection_name):
             if task.progress.status == TaskStatus.RUNNING:
                 return task
@@ -118,14 +122,20 @@ class TaskManager:
     def stop_all_tasks_for_collection(self, collection_name: str) -> int:
         stopped = 0
         for task in self.get_tasks_for_collection(collection_name):
-            if task.progress.status == TaskStatus.RUNNING and self.stop_task(task.task_id):
+            if task.progress.status == TaskStatus.RUNNING and self.stop_task(
+                task.task_id
+            ):
                 stopped += 1
         return stopped
 
     def delete_task(self, task_id: str) -> bool:
         with self._tasks_lock:
             task = self._tasks.get(task_id)
-            if task and task.progress.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.STOPPED):
+            if task and task.progress.status in (
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.STOPPED,
+            ):
                 del self._tasks[task_id]
                 return True
             return False

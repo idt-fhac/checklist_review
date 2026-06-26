@@ -1,10 +1,12 @@
 import json
 from pathlib import Path
+from typing import Any, Dict
 
 from src.core.criteria import criteria_set_stem
-from typing import Dict, Any
-
-from src.review_workflow.components.evaluators.criterion_evaluator.helpers import get_project_root, slug
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import (
+    get_project_root,
+    slug,
+)
 
 
 def get_artifact_file_paths(
@@ -16,7 +18,12 @@ def get_artifact_file_paths(
 ):
     if collections_root is None:
         collections_root = get_project_root() / "workspaces" / "guest" / "collections"
-    artifact_dir = Path(collections_root) / slug(collection_name) / "review_runs" / slug(pipeline_name)
+    artifact_dir = (
+        Path(collections_root)
+        / slug(collection_name)
+        / "review_runs"
+        / slug(pipeline_name)
+    )
     if criteria_set_name:
         criteria_clean = criteria_set_stem(criteria_set_name)
         artifact_dir = artifact_dir / slug(criteria_clean)
@@ -33,7 +40,12 @@ def get_evaluations_file_path(
 ) -> Path:
     if collections_root is None:
         collections_root = get_project_root() / "workspaces" / "guest" / "collections"
-    artifact_dir = Path(collections_root) / slug(collection_name) / "review_runs" / slug(pipeline_name)
+    artifact_dir = (
+        Path(collections_root)
+        / slug(collection_name)
+        / "review_runs"
+        / slug(pipeline_name)
+    )
     if criteria_set_name:
         criteria_clean = criteria_set_stem(criteria_set_name)
         artifact_dir = artifact_dir / slug(criteria_clean)
@@ -50,7 +62,11 @@ def get_persona_evaluations_dir(
     collections_root: Path | None = None,
 ) -> Path:
     base_dir = get_evaluations_file_path(
-        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
+        collection_name,
+        pipeline_name,
+        artifact_name,
+        criteria_set_name,
+        collections_root,
     ).parent
     directory = base_dir / "persona_evaluations"
     directory.mkdir(parents=True, exist_ok=True)
@@ -65,9 +81,16 @@ def get_persona_evaluations_file_path(
     criteria_set_name: str | None = None,
     collections_root: Path | None = None,
 ) -> Path:
-    return get_persona_evaluations_dir(
-        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
-    ) / f"{persona_id}.json"
+    return (
+        get_persona_evaluations_dir(
+            collection_name,
+            pipeline_name,
+            artifact_name,
+            criteria_set_name,
+            collections_root,
+        )
+        / f"{persona_id}.json"
+    )
 
 
 def get_persona_manifest_path(
@@ -77,9 +100,16 @@ def get_persona_manifest_path(
     criteria_set_name: str | None = None,
     collections_root: Path | None = None,
 ) -> Path:
-    return get_persona_evaluations_dir(
-        collection_name, pipeline_name, artifact_name, criteria_set_name, collections_root
-    ) / "manifest.json"
+    return (
+        get_persona_evaluations_dir(
+            collection_name,
+            pipeline_name,
+            artifact_name,
+            criteria_set_name,
+            collections_root,
+        )
+        / "manifest.json"
+    )
 
 
 def load_existing_evaluations(path: Path) -> Dict[str, Any]:

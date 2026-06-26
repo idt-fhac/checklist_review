@@ -1,8 +1,9 @@
-from src.review_workflow.engine.base import BaseComponent
-from src.review_workflow.engine.utils import load_model_from_provider
-from src.review_workflow.engine.token_usage import add as token_usage_add
-from src.core.providers import resolve_provider_config
 from strands import Agent, tool
+
+from src.core.providers import resolve_provider_config
+from src.review_workflow.engine.base import BaseComponent
+from src.review_workflow.engine.token_usage import add as token_usage_add
+from src.review_workflow.engine.utils import load_model_from_provider
 
 
 class Specialist(BaseComponent):
@@ -46,7 +47,13 @@ class Specialist(BaseComponent):
                 A concise, topic-focused analysis of the input text, referencing relevant criteria or standards for {topic}.
             """
             return self.execute_tool(
-                text, collection_name, review_process_name, checklist_name, paper_name, log_callback, token_usage_accumulator
+                text,
+                collection_name,
+                review_process_name,
+                checklist_name,
+                paper_name,
+                log_callback,
+                token_usage_accumulator,
             )
 
         return specialist_tool

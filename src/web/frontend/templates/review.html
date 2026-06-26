@@ -53,11 +53,6 @@
         <input id="collectionName" type="text" placeholder="my_tender_bid" />
         <small>A new project folder is created for each review run.</small>
       </div>
-      <div class="field" id="criteriaSetField">
-        <label for="criteriaSetSelect">Criteria set</label>
-        <select id="criteriaSetSelect"></select>
-        <small id="criteriaSetHint">Required for checklist pipelines; auto-extracted for tender.</small>
-      </div>
       <div class="actions">
         <button type="button" class="primary" id="btnToUpload">Continue to upload</button>
       </div>
@@ -65,16 +60,31 @@
 
     <section id="panel-upload" class="panel" data-step="2">
       <h2>Upload documents</h2>
+      <div class="field" id="criteriaField">
+        <label for="criteriaMode">Criteria</label>
+        <select id="criteriaMode">
+          <option value="preset">Use saved criteria set</option>
+          <option value="custom">Define custom criteria</option>
+          <option value="extract">Extract from RFP</option>
+        </select>
+        <small id="criteriaModeHint">Choose how evaluation criteria are determined.</small>
+        <select id="criteriaSetSelect" style="margin-top: 0.75rem;"></select>
+        <textarea
+          id="customCriteria"
+          hidden
+          placeholder="One criterion per line. Optional weight at end, e.g. (Gewichtung 15%).&#10;# Lines starting with # are ignored."
+        ></textarea>
+      </div>
       <div class="upload-grid">
         <div class="file-card" id="rfpCard">
           <h3>Requirements / RFP</h3>
-          <input type="file" id="rfpFile" accept=".pdf" />
+          <input type="file" id="rfpFile" accept=".pdf,.txt,.md" />
           <div class="file-status" id="rfpStatus">Optional for checklist pipelines; required for tender.</div>
         </div>
         <div class="file-card" id="draftCard">
           <h3>Draft to evaluate</h3>
-          <input type="file" id="draftFile" accept=".pdf" />
-          <div class="file-status" id="draftStatus">PDF of the artifact under review.</div>
+          <input type="file" id="draftFile" accept=".pdf,.txt,.md" />
+          <div class="file-status" id="draftStatus">PDF, TXT, or MD of the artifact under review.</div>
         </div>
       </div>
       <div class="field" style="margin-top: 1rem;">
@@ -103,29 +113,106 @@
       <div id="reportContent" hidden>
         <h2>Report</h2>
         <div id="reportMeta" style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;"></div>
+        <section id="reportInputDocuments" class="input-documents" hidden>
+          <h3 class="report-section-title">Input documents</h3>
+          <div id="inputDocumentLinks" class="input-document-links"></div>
+        </section>
         <div id="reportShare" class="share-row">
           <a id="reportShareLink" href="#" target="_blank" rel="noopener"></a>
           <button type="button" class="secondary" id="btnCopyReviewLink">Copy link</button>
         </div>
-        <div id="reportSummary" class="report-summary"></div>
+
+        <section id="reportOverview" class="report-overview collapsible-section">
+          <button
+            type="button"
+            class="collapsible-header"
+            id="reportOverviewToggle"
+            aria-expanded="true"
+            aria-controls="reportOverviewBody"
+          >
+            <span class="collapsible-label">Criteria</span>
+            <span class="collapsible-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="reportOverviewBody" class="collapsible-body">
+            <div class="overview-stats" id="overviewStats"></div>
+            <table class="eval-table overview-table">
+              <thead>
+                <tr>
+                  <th>Criterion</th>
+                  <th>Weight</th>
+                  <th>Result</th>
+                  <th>Reference</th>
+                </tr>
+              </thead>
+              <tbody id="overviewBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="collapsible-section" id="reportSummarySection">
+          <button
+            type="button"
+            class="collapsible-header"
+            id="reportSummaryToggle"
+            aria-expanded="true"
+            aria-controls="reportSummaryBody"
+          >
+            <span class="collapsible-label">Summary</span>
+            <span class="collapsible-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="reportSummaryBody" class="collapsible-body">
+            <div id="reportSummary" class="report-summary"></div>
+          </div>
+        </section>
+
         <div id="reportDownloads" class="actions" style="margin-bottom: 1rem;"></div>
-        <table class="eval-table">
-          <thead>
-            <tr>
-              <th>Criterion</th>
-              <th>Result</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody id="reportBody"></tbody>
-        </table>
+
+        <section id="personaReviews" class="persona-reviews collapsible-section" hidden>
+          <button
+            type="button"
+            class="collapsible-header"
+            id="personaReviewsToggle"
+            aria-expanded="true"
+            aria-controls="personaReviewsBody"
+          >
+            <span class="collapsible-label">Individual reviewer assessments</span>
+            <span class="collapsible-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="personaReviewsBody" class="collapsible-body">
+            <div class="persona-tabs" id="personaTabs" role="tablist" aria-label="Reviewer views"></div>
+            <table class="eval-table persona-review-table">
+              <thead>
+                <tr>
+                  <th>Criterion</th>
+                  <th>Weight</th>
+                  <th>Result</th>
+                  <th>Evidence</th>
+                </tr>
+              </thead>
+              <tbody id="personaReviewBody"></tbody>
+            </table>
+          </div>
+        </section>
+
         <div class="actions">
+          <button type="button" class="secondary" id="btnBackToSetup">Back to setup</button>
           <button type="button" class="secondary" id="btnNewReview">Start new review</button>
         </div>
       </div>
     </section>
   </main>
 
+  <div id="documentViewer" class="document-viewer" hidden>
+    <div class="document-viewer-panel" role="dialog" aria-modal="true" aria-labelledby="documentViewerTitle">
+      <header class="document-viewer-header">
+        <h3 id="documentViewerTitle">Document</h3>
+        <button type="button" class="secondary" id="btnCloseDocumentViewer">Close</button>
+      </header>
+      <pre id="documentViewerContent" class="document-viewer-content"></pre>
+    </div>
+  </div>
+
+  <script src="{{ url_for('frontend.static', filename='js/marked.min.js') }}"></script>
   <script src="{{ url_for('frontend.static', filename='js/review.js') }}"></script>
 </body>
 </html>

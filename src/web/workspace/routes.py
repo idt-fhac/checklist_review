@@ -1,15 +1,19 @@
-from flask import Blueprint, request, redirect, url_for, flash, render_template, session
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+
 from src.core.workspace import (
-    list_workspaces,
-    get_active_workspace,
-    set_active_workspace,
     create_workspace,
     delete_workspace,
     duplicate_workspace,
+    get_active_workspace,
     is_reserved_workspace_name,
+    list_workspaces,
+    set_active_workspace,
 )
 
-workspace_bp = Blueprint("workspace", __name__, url_prefix="/workspace", template_folder="templates")
+workspace_bp = Blueprint(
+    "workspace", __name__, url_prefix="/workspace", template_folder="templates"
+)
+
 
 @workspace_bp.route("/manage", methods=["GET"])
 def manage():
@@ -23,6 +27,7 @@ def manage():
         show_workspace_onboarding=show_workspace_onboarding,
     )
 
+
 @workspace_bp.route("/switch", methods=["POST"])
 def switch_workspace():
     workspace_name = request.form.get("workspace_name")
@@ -32,6 +37,7 @@ def switch_workspace():
     else:
         flash("Invalid workspace selected.", "danger")
     return redirect(request.referrer or url_for("checklist_review.index"))
+
 
 @workspace_bp.route("/create", methods=["POST"])
 def create_new_workspace():
@@ -78,6 +84,7 @@ def post_duplicate_workspace():
             "danger",
         )
     return redirect(url_for("workspace.manage"))
+
 
 @workspace_bp.route("/delete", methods=["POST"])
 def delete_existing_workspace():

@@ -1,5 +1,7 @@
 from typing import Any, Dict, Literal, Optional
+
 from typing_extensions import TypedDict
+
 
 class LLMProvider(TypedDict, total=False):
     id: str

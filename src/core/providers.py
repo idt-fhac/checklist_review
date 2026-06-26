@@ -36,7 +36,11 @@ def _normalize_provider(raw: Dict[str, Any]) -> LLMProvider:
 
 def load_all_providers() -> List[LLMProvider]:
     cfg = load_providers_config()
-    providers = [_normalize_provider(p) for p in cfg.get("providers") or [] if isinstance(p, dict)]
+    providers = [
+        _normalize_provider(p)
+        for p in cfg.get("providers") or []
+        if isinstance(p, dict)
+    ]
     return providers
 
 
@@ -101,8 +105,9 @@ def get_ollama_models(base_url: str) -> List[str]:
 def get_openai_models(
     base_url: str, api_key: Optional[str] = None, port: Optional[int] = None
 ) -> List[str]:
-    import requests
     from urllib.parse import urlparse, urlunparse
+
+    import requests
 
     try:
         url = base_url.rstrip("/")

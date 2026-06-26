@@ -40,7 +40,9 @@ class CriteriaExtractor(BaseComponent):
 
         provider_id = self.config.get("provider_id")
         if not provider_id:
-            raise ValueError("criteria_extractor requires provider_id (set provider in pipeline YAML)")
+            raise ValueError(
+                "criteria_extractor requires provider_id (set provider in pipeline YAML)"
+            )
         provider_config = resolve_provider_config(provider_id)
 
         document_text = read_document_text(source_path)
@@ -116,11 +118,17 @@ class CriteriaExtractor(BaseComponent):
             for directory in (source_dir, md_dir):
                 if not directory.exists():
                     continue
-                for name in (artifact_name, f"{Path(artifact_name).stem}.pdf", f"{Path(artifact_name).stem}.md"):
+                for name in (
+                    artifact_name,
+                    f"{Path(artifact_name).stem}.pdf",
+                    f"{Path(artifact_name).stem}.md",
+                ):
                     candidate = directory / name
                     if candidate.exists():
                         return candidate
-            raise FileNotFoundError(f"Artifact source not found for criteria extraction: {artifact_name}")
+            raise FileNotFoundError(
+                f"Artifact source not found for criteria extraction: {artifact_name}"
+            )
 
         if source == "rfp":
             if source_dir.exists():

@@ -1,10 +1,9 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from src.core.criteria import criteria_set_stem
-from typing import Dict, Any, Optional
-
 from src.review_workflow.engine.base import BaseComponent
 
 
@@ -26,7 +25,9 @@ class DocumentLoader(BaseComponent):
 
         source_path = self._find_artifact(col_dir, artifact_name)
         if not source_path:
-            raise FileNotFoundError(f"Artifact '{artifact_name}' not found in collection source")
+            raise FileNotFoundError(
+                f"Artifact '{artifact_name}' not found in collection source"
+            )
 
         run_dir = col_dir / "review_runs" / _slug(pipeline_name)
         if criteria_set_name:
@@ -53,33 +54,62 @@ class DocumentLoader(BaseComponent):
             if md_content.strip():
                 if not output_json.exists():
                     metadata = {"method": method, "source_pdf": str(source_path)}
-                    output_json.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-                if self.config.get("extract_pages_as_image", False) and source_path.suffix.lower() == ".pdf":
+                    output_json.write_text(
+                        json.dumps(metadata, indent=2), encoding="utf-8"
+                    )
+                if (
+                    self.config.get("extract_pages_as_image", False)
+                    and source_path.suffix.lower() == ".pdf"
+                ):
                     from src.core.pdf_processing import pdf_to_png
-                    pdf_to_png(source_path, artifact_out_dir / "artifact_pages")
-                return {"output_file": str(output_md), "output_type": "markdown", "status": "cached"}
 
-        metadata = self._extract_content(col_dir, source_path, output_md, output_json, method)
+                    pdf_to_png(source_path, artifact_out_dir / "artifact_pages")
+                return {
+                    "output_file": str(output_md),
+                    "output_type": "markdown",
+                    "status": "cached",
+                }
+
+        metadata = self._extract_content(
+            col_dir, source_path, output_md, output_json, method
+        )
         output_json.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
-        if self.config.get("extract_pages_as_image", False) and source_path.suffix.lower() == ".pdf":
+        if (
+            self.config.get("extract_pages_as_image", False)
+            and source_path.suffix.lower() == ".pdf"
+        ):
             from src.core.pdf_processing import pdf_to_png
+
             pdf_to_png(source_path, artifact_out_dir / "artifact_pages")
 
         if normalized_method == "direct_upload":
-            return {"output_file": str(output_json), "output_type": "direct_upload", "status": "generated"}
+            return {
+                "output_file": str(output_json),
+                "output_type": "direct_upload",
+                "status": "generated",
+            }
 
-        return {"output_file": str(output_md), "output_type": "markdown", "status": "generated"}
+        return {
+            "output_file": str(output_md),
+            "output_type": "markdown",
+            "status": "generated",
+        }
 
     def _find_artifact(self, col_dir: Path, name: str) -> Optional[Path]:
         from src.core import storage
 
         source_dir = storage._source_pdf_dir(col_dir, create=False)
+        if not source_dir.exists():
+            return None
+
         candidate = source_dir / name
         if candidate.exists():
             return candidate
-        if not name.lower().endswith(".pdf"):
-            candidate = source_dir / f"{name}.pdf"
+
+        stem = Path(name).stem
+        for ext in ("", ".pdf", ".md", ".txt"):
+            candidate = source_dir / f"{stem}{ext}"
             if candidate.exists():
                 return candidate
         return None
@@ -95,13 +125,19 @@ class DocumentLoader(BaseComponent):
     def _extract_content(
         self,
         col_dir: Path,
-        pdf_path: Path,
+        source_path: Path,
         output_md: Path,
         output_json: Path,
         method: str,
     ) -> Dict[str, Any]:
         normalized_method = self._normalize_method(method)
-        artifact_stem = pdf_path.stem
+        artifact_stem = source_path.stem
+        suffix = source_path.suffix.lower()
+
+        if suffix in {".md", ".txt"}:
+            content = source_path.read_text(encoding="utf-8")
+            output_md.write_text(content, encoding="utf-8")
+            return {"method": method, "source_file": str(source_path)}
 
         if normalized_method == "extracted_content":
             from src.core import storage
@@ -113,18 +149,18 @@ class DocumentLoader(BaseComponent):
                     f"Extracted markdown not found: {existing_md}. Process the artifact in Collections first."
                 )
             shutil.copy2(existing_md, output_md)
-            return {"method": method, "source_pdf": str(pdf_path)}
+            return {"method": method, "source_file": str(source_path)}
 
         if normalized_method == "force_reextract":
-            from src.core.pdf_processing import pdf_to_markdown, PDFProcessingError
+            from src.core.pdf_processing import PDFProcessingError, pdf_to_markdown
 
             try:
-                pdf_to_markdown(pdf_path, output_md)
+                pdf_to_markdown(source_path, output_md)
             except PDFProcessingError as e:
                 raise RuntimeError(f"Force re-extract failed: {e}") from e
-            return {"method": method, "source_pdf": str(pdf_path)}
+            return {"method": method, "source_file": str(source_path)}
 
         if normalized_method == "direct_upload":
-            return {"method": method, "source_pdf": str(pdf_path)}
+            return {"method": method, "source_file": str(source_path)}
 
         raise ValueError(f"Unknown extraction method: {method}")

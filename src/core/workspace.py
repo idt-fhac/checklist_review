@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
-from flask import session, has_request_context
+from flask import has_request_context, session
 
 from src.core.config_loader import seed_workspace_criteria_sets
 
@@ -31,7 +30,9 @@ def list_workspaces() -> list[str]:
     return sorted(
         d.name
         for d in root.iterdir()
-        if d.is_dir() and not d.name.startswith(".") and d.name != DEFAULTS_WORKSPACE_NAME
+        if d.is_dir()
+        and not d.name.startswith(".")
+        and d.name != DEFAULTS_WORKSPACE_NAME
     )
 
 
@@ -110,7 +111,9 @@ def _seed_new_workspace(name: str, *, merge_missing_only: bool = False) -> None:
         if tmpl_cfg.is_dir():
             _copy_yaml_files_if_missing(tmpl_cfg, cfg_dest)
     seed_workspace_criteria_sets(get_criteria_sets_dir(name))
-    _copy_yaml_files_if_missing(defaults_root / "criteria_sets", get_criteria_sets_dir(name))
+    _copy_yaml_files_if_missing(
+        defaults_root / "criteria_sets", get_criteria_sets_dir(name)
+    )
     _ensure_minimal_settings(cfg_dest)
 
 
@@ -147,7 +150,9 @@ def duplicate_workspace(source_name: str, new_name: str) -> bool:
     for f in cfg_src.glob("*.yaml"):
         shutil.copy2(f, cfg_dest / f.name)
     seed_workspace_criteria_sets(get_criteria_sets_dir(new_name))
-    _copy_yaml_files_if_missing(get_criteria_sets_dir(source_name), get_criteria_sets_dir(new_name))
+    _copy_yaml_files_if_missing(
+        get_criteria_sets_dir(source_name), get_criteria_sets_dir(new_name)
+    )
     return True
 
 

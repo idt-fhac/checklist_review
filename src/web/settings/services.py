@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
-from typing_extensions import TypedDict
 
 import yaml
+from typing_extensions import TypedDict
 
 from src.core.providers import (
     get_ollama_models,
@@ -73,9 +73,18 @@ class SettingsManager:
     @staticmethod
     def save_settings(settings: Settings) -> None:
         SettingsManager.ensure_dirs()
-        payload: Dict[str, Any] = {"schema_version": SETTINGS_SCHEMA_VERSION, **settings}
+        payload: Dict[str, Any] = {
+            "schema_version": SETTINGS_SCHEMA_VERSION,
+            **settings,
+        }
         with open(SettingsManager._get_settings_file(), "w", encoding="utf-8") as f:
-            yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True, default_flow_style=False)
+            yaml.safe_dump(
+                payload,
+                f,
+                sort_keys=False,
+                allow_unicode=True,
+                default_flow_style=False,
+            )
 
     @staticmethod
     def load_secrets() -> List[Dict[str, Any]]:

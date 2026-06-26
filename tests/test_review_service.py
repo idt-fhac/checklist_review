@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core import storage, task_persistence
-from src.web.api.review_service import ReviewServiceError, get_pipeline_manifest, start_review
+from src.web.api.review_service import (
+    ReviewServiceError,
+    get_pipeline_manifest,
+    start_review,
+)
 
 
 class TestReviewService:
@@ -22,10 +26,16 @@ class TestReviewService:
 
     def test_start_review_requires_collection(self):
         with pytest.raises(ReviewServiceError, match="collection_name"):
-            start_review(collection_name="", pipeline_id="scientific_checklist", criteria_set_name="example")
+            start_review(
+                collection_name="",
+                pipeline_id="scientific_checklist",
+                criteria_set_name="example",
+            )
 
     def test_start_review_requires_artifacts(self, isolated_workspace):
-        storage.create_new_collection(isolated_workspace / "collections", "empty_project")
+        storage.create_new_collection(
+            isolated_workspace / "collections", "empty_project"
+        )
         with pytest.raises(ReviewServiceError, match="Upload a draft"):
             start_review(
                 collection_name="empty_project",
@@ -34,7 +44,9 @@ class TestReviewService:
             )
 
     @patch("src.web.api.review_service.multiprocessing.Process")
-    def test_start_review_launches_background_process(self, mock_process, isolated_workspace):
+    def test_start_review_launches_background_process(
+        self, mock_process, isolated_workspace
+    ):
         collections_root = isolated_workspace / "collections"
         storage.create_new_collection(collections_root, "run_project")
         storage.save_selected_list(
@@ -65,10 +77,18 @@ class TestReviewService:
         storage.save_selected_list(
             collections_root,
             "tender_project",
-            [{"filename": "proposal.pdf", "artifact_id": "proposal", "title": "Proposal"}],
+            [
+                {
+                    "filename": "proposal.pdf",
+                    "artifact_id": "proposal",
+                    "title": "Proposal",
+                }
+            ],
         )
 
-        with patch("src.web.api.review_service.multiprocessing.Process") as mock_process:
+        with patch(
+            "src.web.api.review_service.multiprocessing.Process"
+        ) as mock_process:
             mock_process.return_value = MagicMock()
             review_id = start_review(
                 collection_name="tender_project",

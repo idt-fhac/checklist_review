@@ -32,9 +32,17 @@ def find_criteria_set_path(directory: Path, name: str) -> Optional[Path]:
 
 def normalize_criterion(raw: Any, index: int) -> Dict[str, Any]:
     if isinstance(raw, str):
-        return {"id": f"req-{index + 1}", "description": raw, "scoring_type": "checklist"}
+        return {
+            "id": f"req-{index + 1}",
+            "description": raw,
+            "scoring_type": "checklist",
+        }
     if not isinstance(raw, dict):
-        return {"id": f"req-{index + 1}", "description": str(raw), "scoring_type": "checklist"}
+        return {
+            "id": f"req-{index + 1}",
+            "description": str(raw),
+            "scoring_type": "checklist",
+        }
 
     criterion_id = raw.get("id") or f"req-{index + 1}"
     description = raw.get("description") or ""
@@ -49,7 +57,9 @@ def normalize_criterion(raw: Any, index: int) -> Dict[str, Any]:
     return normalized
 
 
-def load_criteria_set(data: CriteriaInput, *, name: Optional[str] = None) -> Dict[str, Any]:
+def load_criteria_set(
+    data: CriteriaInput, *, name: Optional[str] = None
+) -> Dict[str, Any]:
     if isinstance(data, Path):
         payload = _load_yaml_dict(data)
         name = name or payload.get("name") or data.stem
@@ -105,12 +115,18 @@ def criteria_set_document(
     return doc
 
 
-def save_criteria_set_file(path: Path, criteria_set: Dict[str, Any], **extra: Any) -> Dict[str, Any]:
-    normalized = load_criteria_set(criteria_set_document(criteria_set, extra=extra), name=criteria_set.get("name"))
+def save_criteria_set_file(
+    path: Path, criteria_set: Dict[str, Any], **extra: Any
+) -> Dict[str, Any]:
+    normalized = load_criteria_set(
+        criteria_set_document(criteria_set, extra=extra), name=criteria_set.get("name")
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = criteria_set_document(normalized, extra=extra)
     path.write_text(
-        yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, default_flow_style=False),
+        yaml.safe_dump(
+            doc, sort_keys=False, allow_unicode=True, default_flow_style=False
+        ),
         encoding="utf-8",
     )
     return normalized

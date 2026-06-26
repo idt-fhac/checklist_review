@@ -69,7 +69,11 @@ class FeedbackSynthesizer(BaseComponent):
         model = load_model_from_provider(provider_config)
         agent = Agent(model=model, system_prompt=system_prompt)
         response = agent(user_prompt)
-        narrative = getattr(response, "text", None) or getattr(response, "content", None) or str(response)
+        narrative = (
+            getattr(response, "text", None)
+            or getattr(response, "content", None)
+            or str(response)
+        )
 
         run_dir = artifact_run_dir(
             Path(collections_root),
@@ -118,7 +122,9 @@ class FeedbackSynthesizer(BaseComponent):
         for item in evaluations:
             if not isinstance(item, dict):
                 continue
-            criterion = item.get("criterion_text") or item.get("description") or "Criterion"
+            criterion = (
+                item.get("criterion_text") or item.get("description") or "Criterion"
+            )
             answer = item.get("answer")
             reasoning = item.get("reasoning") or item.get("explanation") or ""
             lines.append(f"- {criterion}")

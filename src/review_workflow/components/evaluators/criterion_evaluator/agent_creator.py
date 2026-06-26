@@ -1,19 +1,28 @@
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
-from src.review_workflow.engine.utils import load_model_from_provider
-from src.review_workflow.engine.tool_loader import (
-    discover_review_tools,
-    get_tool_as_tool_function
-)
-from src.review_workflow.components.evaluators.criterion_evaluator.helpers import clean_text_for_encoding
 from strands import Agent
 
+from src.review_workflow.components.evaluators.criterion_evaluator.helpers import (
+    clean_text_for_encoding,
+)
+from src.review_workflow.engine.tool_loader import (
+    discover_review_tools,
+    get_tool_as_tool_function,
+)
+from src.review_workflow.engine.utils import load_model_from_provider
 
-def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any], 
-                        artifact_pages: Optional[List[Dict[str, Any]]] = None,
-                        context: Optional[Dict[str, Any]] = None) -> Agent:
-    
-    base_prompt = config.get("system_prompt", "You are a question-answering assistant that reviews research papers.")
+
+def create_review_agent(
+    provider_config: Dict[str, Any],
+    config: Dict[str, Any],
+    artifact_pages: Optional[List[Dict[str, Any]]] = None,
+    context: Optional[Dict[str, Any]] = None,
+) -> Agent:
+
+    base_prompt = config.get(
+        "system_prompt",
+        "You are a question-answering assistant that reviews research papers.",
+    )
     base_prompt += "\nAnswer the given question based the paper content.\n"
     base_prompt += "IMPORTANT: You MUST provide at least one supporting text either from the given paper content above or results from tool executions in your analysis. \n"
     base_prompt += "Each supporting text item MUST include:\n"
@@ -32,7 +41,7 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
             "axes or labels on plots, colors in visuals, spatial layout of figures, or tables primarily understood from the "
             "rendered page (not answerable from captions alone), you MUST call figure_reviewer before finalizing your answer. "
             "Do not substitute only verbatim markdown excerpts for those cases. You may omit page_numbers to auto-scan "
-            "available page images, or pass explicit page numbers inferred from the paper (e.g. figure captions, \"page N\").\n"
+            'available page images, or pass explicit page numbers inferred from the paper (e.g. figure captions, "page N").\n'
         )
 
     if config.get("use_search"):
@@ -43,18 +52,18 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
         )
 
     base_prompt = clean_text_for_encoding(base_prompt)
-    
+
     # if artifact_pages:
     #     max_page = max((p.get("page_number", 0) for p in artifact_pages), default=0)
     #     additional_text = f"\n\nThe paper has {len(artifact_pages)} pages (pages 1-{max_page}). Use valid page numbers from this range when referencing specific pages."
     #     additional_text = clean_text_for_encoding(additional_text)
     #     base_prompt += additional_text
-    
+
     base_prompt = clean_text_for_encoding(base_prompt)
-    
+
     model = load_model_from_provider(provider_config)
     agent_tools = []
-    
+
     # Discover available tools once
     tools_registry = discover_review_tools()
 
@@ -72,7 +81,7 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
             agent_tools.append(search_func)
         elif context and context.get("log_callback"):
             context["log_callback"]("Failed to load web_search tool", "warning")
-    
+
     # Dynamically load tools from config
     for tool_item in config.get("tools", []):
         if isinstance(tool_item, dict):
@@ -80,25 +89,29 @@ def create_review_agent(provider_config: Dict[str, Any], config: Dict[str, Any],
                 # Check if tool exists in registry
                 if tool_id not in tools_registry:
                     if context and context.get("log_callback"):
-                        context["log_callback"](f"Warning: Tool '{tool_id}' not found. Skipping.", "warning")
+                        context["log_callback"](
+                            f"Warning: Tool '{tool_id}' not found. Skipping.", "warning"
+                        )
                     continue
-                
+
                 # Ensure provider_id is set if not provided
                 if "provider_id" not in tool_cfg:
                     tool_cfg["provider_id"] = config.get("provider_id")
-                
+
                 # Get the tool function dynamically
                 tool_func = get_tool_as_tool_function(
                     tool_id=tool_id,
                     tool_config=tool_cfg,
                     context=context,
-                    tools_registry=tools_registry
+                    tools_registry=tools_registry,
                 )
-                
+
                 if tool_func:
                     agent_tools.append(tool_func)
                 else:
                     if context and context.get("log_callback"):
-                        context["log_callback"](f"Failed to load tool: {tool_id}", "error")
+                        context["log_callback"](
+                            f"Failed to load tool: {tool_id}", "error"
+                        )
 
     return Agent(model=model, system_prompt=base_prompt, tools=agent_tools)

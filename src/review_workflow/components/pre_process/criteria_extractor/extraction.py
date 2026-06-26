@@ -11,20 +11,33 @@ from pydantic import BaseModel, Field
 
 try:
     import pymupdf
+
     PYMUPDF_AVAILABLE = True
 except ImportError:
     PYMUPDF_AVAILABLE = False
 
 from strands import Agent
 
-from src.core.pdf_processing import load_model_from_provider, PDFProcessingError
+from src.core.criteria import normalize_criterion
+from src.core.pdf_processing import PDFProcessingError, load_model_from_provider
 
 
 class ExtractedCriterion(BaseModel):
     id: str = Field(description="Stable requirement id, e.g. req-3.2.1")
     description: str = Field(description="Requirement text")
-    scoring_type: str = Field(default="pass_fail", description="checklist | pass_fail | scale")
-    source_ref: Optional[str] = Field(default=None, description="Section or clause reference")
+    scoring_type: str = Field(
+        default="pass_fail", description="checklist | pass_fail | scale"
+    )
+    source_ref: Optional[str] = Field(
+        default=None, description="Section or clause reference"
+    )
+    weight: Optional[float] = Field(
+        default=None,
+        description="Criterion weight as percentage points when specified (e.g. 15 for 15%)",
+    )
+    mandatory: Optional[bool] = Field(
+        default=None, description="True when the requirement is mandatory"
+    )
 
 
 class ExtractedCriteriaSet(BaseModel):
@@ -35,7 +48,9 @@ def read_document_text(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         if not PYMUPDF_AVAILABLE:
-            raise PDFProcessingError("pymupdf is required to extract text from PDF sources")
+            raise PDFProcessingError(
+                "pymupdf is required to extract text from PDF sources"
+            )
         doc = pymupdf.open(str(path))
         pages = [doc[i].get_text("text", sort=True) for i in range(doc.page_count)]
         doc.close()
@@ -65,6 +80,8 @@ def extract_criteria_from_text(
 
 Use scoring_type "{scoring_default}" unless the document specifies another scheme.
 Include source_ref when a section/clause number is visible.
+When the document specifies scoring weights (e.g. "Gewichtung 15%"), set weight to the numeric percentage (15).
+Mark mandatory requirements with mandatory=true when explicitly required.
 
 Document:
 {document_text[:120000]}
@@ -80,7 +97,11 @@ Document:
         if "structured" not in str(exc).lower():
             raise
         response = agent(user_prompt)
-        text = getattr(response, "text", None) or getattr(response, "content", None) or str(response)
+        text = (
+            getattr(response, "text", None)
+            or getattr(response, "content", None)
+            or str(response)
+        )
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
             raise PDFProcessingError("Failed to parse extracted criteria") from exc
@@ -89,12 +110,8 @@ Document:
     normalized: List[Dict[str, Any]] = []
     for index, item in enumerate(items):
         if isinstance(item, dict):
-            normalized.append(
-                {
-                    "id": str(item.get("id") or f"req-{index + 1}"),
-                    "description": str(item.get("description") or item.get("text") or ""),
-                    "scoring_type": item.get("scoring_type") or scoring_default,
-                    "source_ref": item.get("source_ref"),
-                }
-            )
+            criterion = normalize_criterion(item, index)
+            if not item.get("scoring_type"):
+                criterion["scoring_type"] = scoring_default
+            normalized.append(criterion)
     return [c for c in normalized if c.get("description")]

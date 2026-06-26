@@ -21,6 +21,7 @@ prompts:
   extractor_system: |
     Extract every mandatory requirement from the RFP as atomic criteria.
     Preserve clause references in source_ref when present.
+    When scoring weights are listed (e.g. "Gewichtung 15%"), store the numeric percentage in weight.
   synthesizer_system: |
     Summarize multi-persona evaluation results for procurement stakeholders.
     When personas disagree, explain the disagreement and give a clear recommendation.

@@ -54,7 +54,9 @@ def _parse_stages(pipeline: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any]]]:
         if not isinstance(entry, dict) or len(entry) != 1:
             continue
         stage_name, stage_config = next(iter(entry.items()))
-        stages.append((stage_name, stage_config if isinstance(stage_config, dict) else {}))
+        stages.append(
+            (stage_name, stage_config if isinstance(stage_config, dict) else {})
+        )
     return stages
 
 
@@ -65,7 +67,9 @@ def _merge_profile(pipeline: Dict[str, Any]) -> Dict[str, Any]:
     try:
         profile = load_profile(str(profile_id))
     except FileNotFoundError:
-        logger.warning("Profile '%s' not found for pipeline '%s'", profile_id, pipeline.get("name"))
+        logger.warning(
+            "Profile '%s' not found for pipeline '%s'", profile_id, pipeline.get("name")
+        )
         return pipeline
     merged = dict(pipeline)
     merged["_profile"] = profile
@@ -125,8 +129,12 @@ def _resolve_persona_definition(
     }
 
 
-def _build_evaluation_plan(steps: List[Dict[str, Any]], profile: Dict[str, Any]) -> Dict[str, Any]:
-    evaluator_steps = [step for step in steps if step.get("component_id") == "criterion_evaluator"]
+def _build_evaluation_plan(
+    steps: List[Dict[str, Any]], profile: Dict[str, Any]
+) -> Dict[str, Any]:
+    evaluator_steps = [
+        step for step in steps if step.get("component_id") == "criterion_evaluator"
+    ]
     if not evaluator_steps:
         return {
             "mode": "single",
@@ -146,7 +154,9 @@ def _build_evaluation_plan(steps: List[Dict[str, Any]], profile: Dict[str, Any])
             for persona in first_config.get("personas") or []
             if isinstance(persona, dict)
         ]
-        mode = first_config.get("evaluation_mode") or ("multi_persona" if personas else "single")
+        mode = first_config.get("evaluation_mode") or (
+            "multi_persona" if personas else "single"
+        )
         base_config = dict(first_config)
         base_config.pop("personas", None)
         return {
@@ -160,7 +170,9 @@ def _build_evaluation_plan(steps: List[Dict[str, Any]], profile: Dict[str, Any])
     if len(evaluator_steps) > 1:
         personas = []
         for step in evaluator_steps:
-            personas.append(_resolve_persona_definition(step.get("config") or {}, profile))
+            personas.append(
+                _resolve_persona_definition(step.get("config") or {}, profile)
+            )
         base_config = dict(first_config)
         return {
             "mode": "multi_persona",
@@ -293,7 +305,9 @@ def build_review_process_definition(
         elif comp_id == "feedback_synthesizer":
             review_process_def["feedback_synthesizer"] = {"config": config}
         elif comp_id in ("md_writer", "pdf_writer", "json_writer"):
-            review_process_def["post_processors"].append({"id": comp_id, "config": config})
+            review_process_def["post_processors"].append(
+                {"id": comp_id, "config": config}
+            )
 
     evaluation_plan = _build_evaluation_plan(steps, pipeline.get("_profile") or {})
     base_config = dict(evaluation_plan.get("base_config") or {})

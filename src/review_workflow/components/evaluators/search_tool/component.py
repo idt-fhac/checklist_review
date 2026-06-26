@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+
+from strands import tool
 
 from src.core.criteria import criteria_set_stem
 from src.core.search import SearchError, format_search_results, serper_search
 from src.review_workflow.engine.base import BaseComponent
 from src.review_workflow.engine.run_paths import artifact_run_dir
-from strands import tool
 
 
 class SearchTool(BaseComponent):
@@ -58,7 +59,9 @@ class SearchTool(BaseComponent):
                     results,
                 )
                 if log_callback:
-                    log_callback(f"Web search returned {len(results)} result(s)", "info")
+                    log_callback(
+                        f"Web search returned {len(results)} result(s)", "info"
+                    )
                 return format_search_results(results)
             except SearchError as exc:
                 message = f"Web search failed: {exc}"

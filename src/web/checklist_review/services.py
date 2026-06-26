@@ -85,7 +85,9 @@ def generate_checklist(
     return entries
 
 
-def _render_markdown_summary(paper: Dict[str, Any], items: List[Dict[str, str]], prompt: str) -> str:
+def _render_markdown_summary(
+    paper: Dict[str, Any], items: List[Dict[str, str]], prompt: str
+) -> str:
     lines = [
         f"## {paper.get('title', paper.get('arxiv_id'))}",
         f"Link: {paper.get('url', '')}",

@@ -18,7 +18,12 @@ def artifact_run_dir(
     artifact_name: str,
     criteria_set_name: str | None = None,
 ) -> Path:
-    run_dir = Path(collections_root) / _slug(collection_name) / "review_runs" / _slug(pipeline_name)
+    run_dir = (
+        Path(collections_root)
+        / _slug(collection_name)
+        / "review_runs"
+        / _slug(pipeline_name)
+    )
     if criteria_set_name:
         run_dir = run_dir / _slug(criteria_set_stem(criteria_set_name))
     return run_dir / artifact_name

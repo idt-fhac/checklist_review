@@ -1,9 +1,9 @@
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
-from src.core.criteria import criteria_set_stem
+from pathlib import Path
+from typing import Any, Dict, List
 
+from src.core.criteria import criteria_set_stem
 from src.review_workflow.engine.base import BaseComponent
 
 
@@ -19,11 +19,15 @@ class PdfWriter(BaseComponent):
         criteria_set_name = inputs.get("criteria_set_name")
 
         if not all([collection_name, pipeline_name, artifact_name]):
-            raise ValueError("Missing required inputs: collection_name, pipeline_name, or artifact_name")
+            raise ValueError(
+                "Missing required inputs: collection_name, pipeline_name, or artifact_name"
+            )
 
         collections_root = inputs.get("collections_root")
         if not collections_root:
-            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            project_root = (
+                Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+            )
             collections_root = project_root / "workspaces" / "guest" / "collections"
         collection_dir = Path(collections_root) / _slug(collection_name)
         paper_output_dir = collection_dir / "review_runs" / _slug(pipeline_name)
@@ -76,9 +80,9 @@ class PdfWriter(BaseComponent):
         try:
             from reportlab.lib import colors
             from reportlab.lib.pagesizes import letter
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
             from reportlab.lib.units import inch
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
         except ImportError:
             raise ImportError(
                 "pdf_writer requires reportlab. Install with: pip install reportlab"
@@ -168,7 +172,9 @@ class PdfWriter(BaseComponent):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         story.append(Paragraph(f"Review Report: {artifact_name}", title_style))
         if pipeline_name:
-            story.append(Paragraph(f"Review Process: {pipeline_name}", styles["Normal"]))
+            story.append(
+                Paragraph(f"Review Process: {pipeline_name}", styles["Normal"])
+            )
         if criteria_set_name:
             story.append(Paragraph(f"Checklist: {criteria_set_name}", styles["Normal"]))
         story.append(Paragraph(f"Generated on: {timestamp}", styles["Normal"]))
@@ -179,7 +185,7 @@ class PdfWriter(BaseComponent):
             if s is None:
                 return "N/A"
             s = str(s).replace("<br>", " ").strip()
-            return (s[: max_len] + "…") if len(s) > max_len else s
+            return (s[:max_len] + "…") if len(s) > max_len else s
 
         for i, item in enumerate(evaluations, 1):
             question = clean(item.get("criterion_text", "N/A"))
@@ -196,7 +202,9 @@ class PdfWriter(BaseComponent):
                     page = st.get("page_number", "?")
                     crop = clean(st.get("text_crop") or "")
                     expl = clean(st.get("short_explanation") or "", 300)
-                    story.append(Paragraph(f"Reference {idx} (Page {page})", ref_label_style))
+                    story.append(
+                        Paragraph(f"Reference {idx} (Page {page})", ref_label_style)
+                    )
                     if crop:
                         story.append(Paragraph(crop, quote_style))
                     if expl:
