@@ -1,0 +1,28 @@
+name: Build Docker Container
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.1.0
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v7.2.0
+        with:
+          context: .
+          push: false
+          tags: checklist-reviewer:latest

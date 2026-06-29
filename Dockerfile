@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 # Install system dependencies if required (e.g. build-essential, git)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast dependency management
-COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.25 /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
